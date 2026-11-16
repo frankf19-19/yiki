@@ -580,6 +580,8 @@ html[lang=ja] .stamp b,html[lang=ko] .stamp b{font-size:10px;white-space:normal;
 .pcard.done .nm{color:var(--ink-2)}
 .today3.small{margin-top:20px}
 .today3.small .pcard{padding:14px 4px 12px}
+.today3 .stamp{right:-8px;top:-10px;bottom:auto;width:52px;height:52px}
+.today3 .stamp b{font-size:12px}
 .today3.small .stamp{width:46px;height:46px;right:-8px;top:-10px;bottom:auto}
 .today3.small .stamp b{font-size:10px}.today3.small .stamp i{font-size:14px}
 .lang.seg button{white-space:nowrap;font-size:13px;padding:0 6px}
@@ -728,6 +730,10 @@ html[lang=ja] .big-stamp b,html[lang=ko] .big-stamp b{font-size:20px}
 .fam-nav .inner{max-width:720px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .fam-nav .eyebrow{font-size:13px;color:var(--ink-3)}
 .fam-nav h1.large{font-size:30px;margin:0;color:var(--ink);line-height:1.15;letter-spacing:.04em}
+.fam-nav .inner>div{min-width:0;flex:1}
+.fam-nav h1.large{font-size:clamp(20px,6.8vw,30px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fam-nav .nav-btn{flex:none;white-space:nowrap}
+@media (max-width:400px){.fam-nav .nav-btn{font-size:15px;padding:0 12px 0 10px;gap:4px}.fam-nav h1.large{letter-spacing:.01em}}
 .fam[data-tab="today"] [data-t]:not([data-t="today"]),
 .fam[data-tab="trends"] [data-t]:not([data-t="trends"]),
 .fam[data-tab="care"] [data-t]:not([data-t="care"]),
@@ -1125,6 +1131,8 @@ html:not(.gentle) .mfig .body,html:not(.gentle) .mfig .chair{filter:url(#wobs)}
 .mt-s{font-size:calc(14px*var(--fs,1));color:var(--ink-2);line-height:1.35}
 .more-tiles.one .mtile{flex-direction:row;text-align:left;gap:14px}
 .more-tiles.one .mt-t{flex:none}
+.mtile .mt-tx{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.more-tiles.one .mt-tx{align-items:flex-start;flex:1}
 .home-actions{position:sticky;bottom:0;z-index:5;margin-left:-4px;margin-right:-4px;padding:18px 4px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to bottom, rgba(251,247,238,0), var(--paper) 28%)}
 .nav-r{display:flex;gap:8px;align-items:center}
 .help-pill{border-color:var(--red)!important;color:var(--red)!important;background:#FFF0EC!important}
@@ -1162,6 +1170,7 @@ html[lang^=en] .tile.word{font-size:calc(20px * var(--fs));hyphens:auto}
   .hb-grid{grid-template-columns:1fr}
   .more-tiles{grid-template-columns:1fr}
   .more-tiles .mtile{flex-direction:row;text-align:left;gap:12px}
+  .more-tiles .mt-tx{align-items:flex-start;flex:1}
 }
 
 /* 高對比：覆蓋 v2.0 繪本風的新色彩變數 */
@@ -1311,6 +1320,22 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 .fb-cats{margin:4px 0 8px}
 .sync-acts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.sync-steps{font-size:14px;color:var(--ink-2)}.sync-lbl{display:block;font-weight:700;font-size:15px;margin:12px 0 6px}#synctext{min-height:72px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
 [hidden]{display:none!important}
+.pcard .nm,.pick .nm,.result-card h2,.result-card .warm,.celebrate h1,.warm.big,.bubble p,.game-title,.intro .desc,.instr .txt,.mt-t,.mt-s,.gt span,.cel h1,.cel-wrap h1{text-wrap:balance}
+/* 矮螢幕（iPhone SE、加到主畫面後的小手機）：答案按鈕盡量不用捲動就看得到 */
+@media (max-height:780px){
+  .clock{width:min(62vw,280px,34vh)}
+  .face-frame{width:min(68vw,280px,33vh);margin-bottom:12px}
+  .song-stage{width:min(56vw,230px,21vh)}
+  .song-again{margin-top:6px}
+  .song-opts{margin-top:10px;gap:8px}
+  .song-opts .opt{min-height:54px}
+  .opt{min-height:calc(66px * var(--fs))}
+  .tile.word{min-height:calc(60px * var(--fs))}
+  .receipt{padding:12px 18px 14px;margin-bottom:12px}
+  .receipt .head{padding-bottom:8px}
+  .receipt .head .ic .art{width:44px;height:44px}
+  .receipt .line{padding:6px 0}
+}
 </style>
 </head>
 <body>
@@ -1322,7 +1347,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.43.0';
+const BUILD = '2.44.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -2624,8 +2649,8 @@ function moreTilesHTML(){
   if(!showMove && !hasStory) return calmTileHTML();
   const cover = hasStory ? S.story[S.story.length-1] : null;
   return `<div class="more-tiles ${hasStory&&showMove?'':'one'}">
-    ${showMove?`<button class="mtile move-t" data-act="move-open">${moveFig('breathe').replace('class="mfig m-breathe"','class="mfig mini"')}<span class="mt-t">${esc(U.moveOpen)}</span><span class="mt-s">${esc(n?U.moveDoneToday:U.moveOpenSub)}</span></button>`:''}
-    ${hasStory?`<button class="mtile story-t" data-act="story-open"><span class="polaroid sm"><img src="${esc(cover.img)}" alt=""></span><span class="mt-t">${esc(U.storyOpen)}</span><span class="mt-s">${esc(U.storyOpenSub(S.story.length))}</span></button>`:''}
+    ${showMove?`<button class="mtile move-t" data-act="move-open">${moveFig('breathe').replace('class="mfig m-breathe"','class="mfig mini"')}<span class="mt-tx"><span class="mt-t">${esc(U.moveOpen)}</span><span class="mt-s">${esc(n?U.moveDoneToday:U.moveOpenSub)}</span></span></button>`:''}
+    ${hasStory?`<button class="mtile story-t" data-act="story-open"><span class="polaroid sm"><img src="${esc(cover.img)}" alt=""></span><span class="mt-tx"><span class="mt-t">${esc(U.storyOpen)}</span><span class="mt-s">${esc(U.storyOpenSub(S.story.length))}</span></span></button>`:''}
   </div>${calmTileHTML()}`;
 }
 function calmTileHTML(){
