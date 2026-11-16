@@ -1,5 +1,5 @@
 /* 憶起玩 Yiki — service worker（離線快取） */
-const BUILD = '2.44.0';
+const BUILD = '2.45.0';
 const CACHE = 'yiki-' + BUILD;
 const ASSETS = ['./', './index.html', './manifest.json', './manifest.zh-TW.json', './manifest.ja-JP.json', './manifest.ko-KR.json', './manifest.en-US.json', './manifest.en-CA.json', './locales/zh-TW.js', './locales/ja-JP.js', './locales/ko-KR.js', './locales/en-US.js', './locales/en-CA.js', './art.js', './lib/qrcode.js', './fonts/zh-TW.css', './fonts/ja-JP.css', './fonts/ko-KR.css', './fonts/en-US.css', './fonts/en-CA.css', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/icon.svg', './icons/favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });

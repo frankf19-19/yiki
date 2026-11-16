@@ -1320,7 +1320,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 .fb-cats{margin:4px 0 8px}
 .sync-acts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.sync-steps{font-size:14px;color:var(--ink-2)}.sync-lbl{display:block;font-weight:700;font-size:15px;margin:12px 0 6px}#synctext{min-height:72px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
 [hidden]{display:none!important}
-.pcard .nm,.pick .nm,.result-card h2,.result-card .warm,.celebrate h1,.warm.big,.bubble p,.game-title,.intro .desc,.instr .txt,.mt-t,.mt-s,.gt span,.cel h1,.cel-wrap h1{text-wrap:balance}
+.pcard .nm,.pick .nm,.result-card h2,.result-card .warm,.celebrate h1,.warm.big,.bubble p,.game-title,.intro .desc,.instr .txt,.mt-t,.mt-s,.calm-photo p,.gift-cap,.gt span,.cel h1,.cel-wrap h1{text-wrap:balance}
 /* 矮螢幕（iPhone SE、加到主畫面後的小手機）：答案按鈕盡量不用捲動就看得到 */
 @media (max-height:780px){
   .clock{width:min(62vw,280px,34vh)}
@@ -1336,6 +1336,16 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
   .receipt .head .ic .art{width:44px;height:44px}
   .receipt .line{padding:6px 0}
 }
+/* 動一動／安心時光：主要按鈕固定在底部，小手機不用捲就看得到 */
+.screen.move .actions,.screen.calm .actions{position:sticky;bottom:0;z-index:5;margin-left:-4px;margin-right:-4px;padding:18px 4px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to bottom, rgba(251,247,238,0), var(--paper) 28%)}
+.screen.calm .actions{background:linear-gradient(to bottom, rgba(247,243,236,0), #F7F3EC 28%)}
+html.hc .screen.move .actions,html.hc .screen.calm .actions{background:linear-gradient(to bottom, rgba(255,255,255,0), #fff 28%)}
+.story-nav .big-btn{white-space:nowrap;min-width:0}
+@media (max-height:780px){
+  .move-stage{width:min(64vw,260px,30vh)}
+  .calm-photo{max-width:min(340px,30vh)}
+  .breath-wrap .breath{width:150px;height:150px}
+}
 </style>
 </head>
 <body>
@@ -1347,7 +1357,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.44.0';
+const BUILD = '2.45.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -1387,11 +1397,11 @@ function sanitize(j){
   Object.keys(o.medLog).forEach(d => { const m = o.medLog[d]; if(!isObj(m)) delete o.medLog[d]; else Object.keys(m).forEach(k => { if(!/^[A-Za-z0-9_-]{1,40}\|.{1,16}$/.test(k)) delete m[k]; }); });
   o.sessions = o.sessions.filter(x => isObj(x) && typeof x.g === 'string' && /^[a-z]{2,20}$/.test(x.g) && typeof x.d === 'string' && DATE_RE.test(x.d)).map(x => Object.assign(x, { score: Math.max(0, Math.min(100, +x.score || 0)), lvl: Math.max(1, Math.min(5, Math.round(+x.lvl) || 1)), sec: Math.max(0, +x.sec || 0), dom: str(x.dom).replace(/[^a-z]/g,''), daily: !!x.daily, ts: +x.ts || 0 }));
   Object.keys(o.levels).forEach(g => { const v = Math.round(+o.levels[g]); o.levels[g] = v>=1 && v<=5 ? v : 1; });
-  o.meds = o.meds.filter(m => isObj(m) && typeof m.name === 'string' && Array.isArray(m.times)).map(m => Object.assign(m, { since: typeof m.since === 'string' && DATE_RE.test(m.since) ? m.since : undefined, id: nid(m.id), times: m.times.filter(t => typeof t === 'string' && t.length <= 16) }));
+  o.meds = o.meds.slice(0, 30).filter(m => isObj(m) && typeof m.name === 'string' && Array.isArray(m.times)).map(m => Object.assign(m, { since: typeof m.since === 'string' && DATE_RE.test(m.since) ? m.since : undefined, id: nid(m.id), times: m.times.filter(t => typeof t === 'string' && t.length <= 16) }));
   o.photos = o.photos.filter(x => isObj(x) && typeof x.img === 'string' && IMG_RE.test(x.img) && typeof x.name === 'string').map(x => Object.assign(x, { id: nid(x.id) }));
   o.story = o.story.filter(x => isObj(x) && typeof x.img === 'string' && IMG_RE.test(x.img)).map(x => Object.assign(x, { id: nid(x.id), text: str(x.text), year: str(x.year), audio: aud(x.audio) }));
   const nd = new Date(), tk = `${nd.getFullYear()}-${String(nd.getMonth()+1).padStart(2,'0')}-${String(nd.getDate()).padStart(2,'0')}`;
-  o.plans = o.plans.filter(x => isObj(x) && typeof x.text === 'string' && x.text && (x.kind === 'weekly' ? Number.isInteger(x.dow) && x.dow >= 0 && x.dow <= 6 : /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.date >= tk))
+  o.plans = o.plans.slice(0, 60).filter(x => isObj(x) && typeof x.text === 'string' && x.text && (x.kind === 'weekly' ? Number.isInteger(x.dow) && x.dow >= 0 && x.dow <= 6 : /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.date >= tk))
     .map(x => Object.assign(x, { id: nid(x.id), time: /^\d{1,2}:\d{2}$/.test(x.time) ? x.time.padStart(5,'0') : '', kind: x.kind === 'weekly' ? 'weekly' : 'once' }));
   Object.keys(o.habits).forEach(k => { if(!Array.isArray(o.habits[k])) delete o.habits[k]; else o.habits[k] = o.habits[k].filter(x => /^[a-z]{2,12}$/.test(x)); });
   Object.keys(o.logs).forEach(k => { const l = o.logs[k]; if(!isObj(l)) { delete o.logs[k]; return; } l.events = Array.isArray(l.events) ? l.events.filter(x => typeof x === 'string') : []; l.note = str(l.note); ['sleep','mood','appetite'].forEach(f => { if(f in l && ![0,1,2].includes(l[f])) delete l[f]; }); });
@@ -2440,15 +2450,50 @@ function plansSecHTML0(){
    長輩手機 → 家人手機：紀錄（遊戲、吃藥打勾、每日狀況、動一動…）；收到後一律經過 sanitize ---------- */
 const b64u = bytes => { let s = ''; bytes.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
 const unb64u = str => { const s = atob(str.replace(/-/g,'+').replace(/_/g,'/') + '==='.slice((str.length + 3) % 4)); return Uint8Array.from(s, c => c.charCodeAt(0)); };
+/* 兩支手機代碼：
+   z = deflate 壓縮後 base64（新手機）
+   j = 直接放 JSON 文字（舊 iPhone 沒有 CompressionStream 時；中文一個字只佔一個字，比 base64 短很多，LINE 5000 字放得下）
+   無 = 舊版 base64（只用來讀舊代碼） */
 async function packCode(kind, obj){
-  const raw = new TextEncoder().encode(JSON.stringify(obj));
-  if(window.CompressionStream){ try{ const buf = await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer(); return `YK1${kind}z.` + b64u(new Uint8Array(buf)); }catch(_){} }
-  return `YK1${kind}.` + b64u(raw);
+  const json = JSON.stringify(obj);
+  if(window.CompressionStream){ try{ const raw = new TextEncoder().encode(json); const buf = await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer(); return `YK1${kind}z.` + b64u(new Uint8Array(buf)); }catch(_){} }
+  return `YK1${kind}j.` + json.replace(/[\u2028\u2029]/g, c => '\\u' + c.charCodeAt(0).toString(16));
+}
+/* 舊手機沒有 DecompressionStream 時，用這段純 JS 解壓（RFC 1951 inflate，依 zlib puff 寫法） */
+function inflateRaw(src){
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258], LE=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577], DE=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const ORD=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+  let pos=0, bit=0; const out=[];
+  const getbit=()=>{ if(pos>=src.length) throw new Error('eof'); const b=(src[pos]>>bit)&1; if(++bit===8){ bit=0; pos++; } return b; };
+  const bits=n=>{ let v=0; for(let i=0;i<n;i++) v|=getbit()<<i; return v; };
+  const build=lens=>{ const count=new Array(16).fill(0), sym=[], offs=new Array(16).fill(0); lens.forEach(l=>count[l]++); count[0]=0; for(let i=1;i<16;i++) offs[i]=offs[i-1]+count[i-1]; lens.forEach((l,s)=>{ if(l) sym[offs[l]++]=s; }); return { count, sym }; };
+  const dec=h=>{ let code=0, first=0, index=0; for(let len=1;len<16;len++){ code|=getbit(); const c=h.count[len]; if(code-c<first) return h.sym[index+(code-first)]; index+=c; first+=c; first<<=1; code<<=1; } throw new Error('bad code'); };
+  let last;
+  do{
+    last=bits(1); const type=bits(2);
+    if(type===0){ if(bit){ bit=0; pos++; } if(pos+4>src.length) throw new Error('eof'); const len=src[pos]|(src[pos+1]<<8); pos+=4; if(pos+len>src.length) throw new Error('eof'); for(let i=0;i<len;i++) out.push(src[pos++]); continue; }
+    let lit, dist;
+    if(type===1){ const l=[]; for(let i=0;i<288;i++) l.push(i<144?8:i<256?9:i<280?7:8); lit=build(l); dist=build(new Array(30).fill(5)); }
+    else if(type===2){
+      const hl=bits(5)+257, hd=bits(5)+1, hc=bits(4)+4; const cl=new Array(19).fill(0); for(let i=0;i<hc;i++) cl[ORD[i]]=bits(3); const ch=build(cl); const lens=[];
+      while(lens.length<hl+hd){ const sy=dec(ch); if(sy<16) lens.push(sy); else if(sy===16){ if(!lens.length) throw new Error('bad'); const pv=lens[lens.length-1]; for(let r=3+bits(2);r>0;r--) lens.push(pv); } else if(sy===17){ for(let r=3+bits(3);r>0;r--) lens.push(0); } else { for(let r=11+bits(7);r>0;r--) lens.push(0); } }
+      if(lens.length>hl+hd) throw new Error('bad'); lit=build(lens.slice(0,hl)); dist=build(lens.slice(hl));
+    } else throw new Error('bad type');
+    for(;;){ const sy=dec(lit); if(sy<256){ out.push(sy); continue; } if(sy===256) break; const k=sy-257; if(k>=29) throw new Error('bad'); const len=LB[k]+bits(LE[k]); const dk=dec(dist); if(dk>=30) throw new Error('bad'); const d=DB[dk]+bits(DE[dk]); if(d>out.length) throw new Error('bad dist'); for(let i=0;i<len;i++) out.push(out[out.length-d]); if(out.length>2e6) throw new Error('too big'); }
+  } while(!last);
+  return new Uint8Array(out);
 }
 async function unpackCode(text){
-  const m = String(text||'').match(/YK1([SR])(z?)\.([A-Za-z0-9_-]{8,})/); if(!m) return null;
+  const str = String(text||'');
+  const mj = str.match(/YK1([SR])j\.(\{[^\n\r]*\})/);
+  if(mj){ let obj; try{ obj = JSON.parse(mj[2]); }catch(_){ return null; } return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? { kind: mj[1], obj } : null; }
+  const m = str.match(/YK1([SR])(z?)\.([A-Za-z0-9_-]{8,})/); if(!m) return null;
   let bytes = unb64u(m[3]);
-  if(m[2]){ if(!window.DecompressionStream) throw new Error('nodecomp'); bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); }
+  if(m[2]){
+    if(window.DecompressionStream){ try{ bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); }catch(_){ bytes = inflateRaw(bytes); } }
+    else bytes = inflateRaw(bytes);
+  }
   const obj = JSON.parse(new TextDecoder().decode(bytes)); if(!obj || typeof obj !== 'object') return null;
   return { kind: m[1], obj };
 }
@@ -3291,7 +3336,7 @@ document.addEventListener('click', e => {
     case 'sync-s': syncShare('S'); break;
     case 'sync-r': syncShare('R'); break;
     case 'sync-apply': syncApply(); break;
-    case 'sync-paste': navigator.clipboard.readText().then(txt => { const t = $('#synctext'); if(t) t.value = txt || ''; if(!/YK1[SR]z?\./.test(txt || '')){ toast(U.syncBad); return; } syncApply(); }).catch(() => toast(U.syncPasteFail)); break;
+    case 'sync-paste': navigator.clipboard.readText().then(txt => { const t = $('#synctext'); if(t) t.value = txt || ''; if(!/YK1[SR][zj]?\./.test(txt || '')){ toast(U.syncBad); return; } syncApply(); }).catch(() => toast(U.syncPasteFail)); break;
     case 'demo-add': demoAdd(); renderFamily(); toast(U.demoAdded); break;
     case 'demo-clear': ask(U.demoClearConfirm).then(ok => { if(ok){ demoClear(); renderFamily(); toast(U.saved); } }); break;
     case 'fb-cat': fbCat = +b.dataset.i; { const t = $('#fbtext'); const keep = t ? t.value : ''; $('#fbsec').innerHTML = feedbackSecHTML(); const n = $('#fbtext'); if(n){ n.value = keep; } } break;
@@ -3325,7 +3370,7 @@ document.addEventListener('click', e => {
     case 'intro-start': { const g = flow.list[flow.i]; S.seen[g] = true; save(); SFX.tap(); startGameNow(g, levelOf(g)); break; }
     case 'flow-next': SFX.tap(); flowNext(); break;
     case 'med-take': { const lg=medToday(); const k=b.dataset.k; lg[k]=!lg[k]; S.medLog[todayKey()]=lg; save(); if(lg[k]) SFX.good(); const home = $('.med-card'); if(home){ home.outerHTML = medCardHTML(); } break; }
-    case 'med-add': { const nm=$('#medname').value.trim(); if(!nm || !newMedSlots.size){ toast(U.medNamePh); break; } S.meds.push({ id: Date.now().toString(36), name:nm, times:U.medSlots.filter(t=>newMedSlots.has(t)), since: todayKey() }); save(); newMedSlots=new Set([U.medSlots[0]]); $('#medsec').innerHTML=`<h2>${esc(U.medsTitle)}<small>${esc(U.medsSub)}</small></h2>${medsManageHTML()}`; toast(U.saved); break; }
+    case 'med-add': { const nm=$('#medname').value.trim(); if(!nm || !newMedSlots.size){ toast(U.medNamePh); break; } if(S.meds.length >= 12){ toast(U.medFull); break; } if(S.meds.some(m=>m.name.trim().toLowerCase()===nm.toLowerCase())){ toast(U.medDup); $('#medname').focus(); break; } S.meds.push({ id: Date.now().toString(36), name:nm, times:U.medSlots.filter(t=>newMedSlots.has(t)), since: todayKey() }); save(); newMedSlots=new Set([U.medSlots[0]]); $('#medsec').innerHTML=`<h2>${esc(U.medsTitle)}<small>${esc(U.medsSub)}</small></h2>${medsManageHTML()}`; toast(U.saved); break; }
     case 'med-del': ask(U.medDelConfirm((S.meds.find(m=>m.id===b.dataset.id)||{}).name||'')).then(ok=>{ if(ok){ S.meds=S.meds.filter(m=>m.id!==b.dataset.id); save(); $('#medsec').innerHTML=`<h2>${esc(U.medsTitle)}<small>${esc(U.medsSub)}</small></h2>${medsManageHTML()}`; } }); break;
     case 'to-summary': go('summary'); break;
     case 'lang': setLocale(b.dataset.l); break;
@@ -3334,7 +3379,9 @@ document.addEventListener('click', e => {
     case 'flow-end': flowEnd(); break;
     case 'orient-speak': { const now=new Date(); speak(U.orientSay(now, dayPart(), plansFor(now).map(p=>Object.assign({},p,{time:p.time?fmtT(p.time):''})))); break; }
     case 'plan-add': { const t=$('#plantext').value.trim(); if(!t){ toast(U.planTextPh); $('#plantext').focus(); break; }
-      const w=$('#planwhen').value, tm=$('#plantime').value; const p={ id: Date.now().toString(36), text:t, time:tm||'' };
+      if((S.plans||[]).length >= 20){ toast(U.planFull); break; }
+      let w=$('#planwhen').value; const tm=$('#plantime').value; const p={ id: Date.now().toString(36), text:t, time:tm||'' };
+      if(w==='today' && tm){ const n=new Date(); const now=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); if(tm < now){ ask(U.planPast).then(ok=>{ if(!ok) return; const pw=$('#planwhen'); if(pw){ pw.value='tomorrow'; const pb=document.querySelector('[data-act=plan-add]'); if(pb) pb.click(); } }); break; } }
       if(w==='today'){ p.kind='once'; p.date=todayKey(); } else if(w==='tomorrow'){ p.kind='once'; p.date=todayKey(new Date(Date.now()+864e5)); } else { p.kind='weekly'; p.dow=+w.slice(1); }
       S.plans=(S.plans||[]).concat(p); save(); toast(U.saved); $('#plansec').innerHTML=plansSecHTML(); break; }
     case 'plan-del': S.plans=(S.plans||[]).filter(x=>x.id!==b.dataset.id); save(); $('#plansec').innerHTML=plansSecHTML(); break;
