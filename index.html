@@ -1305,6 +1305,10 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 .inst-card .tx{flex:1;min-width:0}.inst-card .tx b{display:block;font-size:16px;margin-bottom:4px}.inst-card .tx p{margin:0 0 10px;font-size:14px;line-height:1.55;color:var(--ink-2)}
 .inst-card .acts{display:flex;gap:8px;flex-wrap:wrap}
 .brand-ic{width:30px;height:30px;border-radius:8px;vertical-align:-6px;margin-right:8px;border:1.5px solid var(--ink)}
+.demo-card{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#FFF7DC;border-style:dashed}
+.demo-card p{margin:0;flex:1;min-width:200px;font-size:15px;line-height:1.55;color:var(--ink-2)}.demo-card p b{display:block;color:var(--ink);font-size:16px;margin-bottom:2px}
+.demo-card.on{background:#EAF1F6}
+.fb-cats{margin:4px 0 8px}
 </style>
 </head>
 <body>
@@ -1316,7 +1320,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.40.0';
+const BUILD = '2.41.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -1346,6 +1350,7 @@ function sanitize(j){
   ['sessions','meds','photos','story','plans'].forEach(k => { if(!Array.isArray(o[k])) o[k] = []; });
   ['levels','seen','logs','medLog','storyLog','moveLog','habits','recent'].forEach(k => { if(!isObj(o[k])) o[k] = {}; });
   if('installHide' in o) o.installHide = !!o.installHide;
+  if(o.demo !== undefined){ if(!isObj(o.demo)) delete o.demo; else { ['days','medIds','medLogDays'].forEach(k => { o.demo[k] = Array.isArray(o.demo[k]) ? o.demo[k].filter(x => typeof x === 'string' && x.length < 40) : []; }); } }
   if(o.askDoc !== undefined){ o.askDoc = Array.isArray(o.askDoc) ? o.askDoc.filter(x => isObj(x) && typeof x.text === 'string' && x.text.trim()).slice(0,20).map(x => ({ id: nid(x.id), text: x.text.slice(0,80), ts: +x.ts || 0 })) : []; }
   if(o.cg !== undefined){ if(!isObj(o.cg)) o.cg = {}; Object.keys(o.cg).forEach(k => { if(!DATE_RE.test(k) || ![0,1,2].includes(o.cg[k])) delete o.cg[k]; }); }
   { const cut = new Date(Date.now()-730*864e5).toISOString().slice(0,10); ['medLog','storyLog','moveLog','habits'].forEach(k => Object.keys(o[k]).forEach(d => { if(/^\d{4}-\d\d-\d\d$/.test(d) && d < cut) delete o[k][d]; })); }
@@ -2249,6 +2254,7 @@ function renderFamily0(){
       <div class="kpi"><div class="v">${todayAvg ?? '–'}</div><div class="l">${esc(U.today)}${esc(U.avgScore)}</div></div>
       <div class="kpi"><div class="v">${sess28.length}</div><div class="l">${esc(U.kpi28)}</div></div>
     </section>
+    ${demoCardHTML()}
     <section class="sec list" data-t="today">
       <h2>${esc(U.todayPlate)}</h2>
       ${games.map(g=>{ const d=g in done; return `<div class="row">${gameIcon(g)}<div class="row-main"><div class="row-t">${esc(L.games[g].name)}</div><div class="row-s">${esc(L.domains[GAME_DOMAIN[g]].name)}</div></div>${d?`<span class="score">${done[g]}</span>`:`<span class="muted-s">${esc(U.notYet)}</span>`}</div>`; }).join('')}
@@ -2322,6 +2328,7 @@ function renderFamily0(){
     ${S.setupHide && SETUP.some(x=>!x[1]()) ? `<section class="sec" data-t="settings"><button class="small-btn" data-act="setup-show">${esc(U.setupShow)}</button></section>` : ''}
     <section class="sec home-sec" id="homesec" data-t="settings">${homeSecHTML()}</section>
     <section class="sec hab-sec" id="habsec" data-t="settings">${habSecHTML()}</section>
+    <section class="sec fb-sec" id="fbsec" data-t="settings">${feedbackSecHTML()}</section>
     <section class="sec install" data-t="settings">
       <h2>${esc(U.installTitle)}<small>${esc(U.installSub)}</small></h2>
       ${isStandalone() ? `<p class="hint">${esc(U.instDone)}</p>` : `${deferredInstall?`<button class="save-btn" data-act="install" style="width:100%;margin-bottom:12px">${esc(U.installBtn)}</button>`:''}
@@ -2339,7 +2346,7 @@ function renderFamily0(){
       <div class="form-row"><label>${esc(U.soundLbl)}</label><div class="seg" id="sd"><button data-v="1" class="${S.sound?'on':''}">${esc(U.on)}</button><button data-v="0" class="${!S.sound?'on':''}">${esc(U.off)}</button></div></div>
       <div class="form-row"><label>${esc(U.familyCode)}</label><div class="code"><span class="c">${esc(S.familyCode)}</span><button class="small-btn" data-act="regen">${esc(U.regenerate)}</button></div><div class="hint">${esc(U.familyCodeHint)}</div></div>
       <div class="form-row"><label>${esc(U.dataTitle)}</label><div class="hint" style="margin:0 0 8px">${esc(U.dataHint)}</div>${storageMeterHTML()}
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="small-btn" data-act="export">${esc(U.exportBtn)}</button><button class="small-btn" data-act="import">${esc(U.importBtn)}</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="small-btn" data-act="export">${esc(U.exportBtn)}</button><button class="small-btn" data-act="import">${esc(U.importBtn)}</button>${S.demo ? `<button class="small-btn" data-act="demo-clear">${esc(U.demoClear)}</button>` : `<button class="small-btn" data-act="demo-add">${esc(U.demoAdd)}</button>`}</div>
         <input type="file" id="impfile" accept="application/json,.json" hidden></div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px">
         <button class="small-btn danger" data-act="reset">${esc(U.resetData)}</button>
@@ -2401,6 +2408,58 @@ function plansSecHTML0(){
     <div class="plan-form"><input type="text" id="plantext" maxlength="30" placeholder="${esc(U.planTextPh)}">
       <div class="sf-row"><select id="planwhen" aria-label="${esc(U.planWhenLbl)}"><option value="today">${esc(U.planToday)}</option><option value="tomorrow">${esc(U.planTomorrow)}</option>${dayOpt}</select><input type="time" id="plantime" aria-label="${esc(U.planTimeLbl)}"><button class="save-btn" data-act="plan-add">${esc(U.medAdd)}</button></div></div>`;
 }
+/* ---------- 試用：範例資料（看看用了一週的樣子，可一鍵清除）＋ App 內回報問題 ---------- */
+function demoAdd(){
+  if(S.demo) return;
+  const days = rangeDays(1,7), games = Object.keys(L.games).filter(g => g !== 'faces' && g !== 'song');
+  const demo = { days: [], medIds: [] };
+  days.forEach((d, di) => {
+    if(di === 2) return; // 留一天沒玩，看起來比較真實
+    const trio = [0,1,2].map(i => games[(di*3+i) % games.length]);
+    trio.forEach((g, i) => S.sessions.push({ d, g, dom: GAME_DOMAIN[g], score: 58 + ((di*17 + i*11) % 38), lvl: di > 4 ? 2 : 1, sec: 50 + i*15, daily: true, ts: new Date(d+'T10:00:00').getTime() + i*60000, demo: true }));
+    if(!S.logs[d]){ S.logs[d] = { sleep: [0,1,0,2,0,1,0][di], mood: [0,0,1,1,0,0,1][di], appetite: [0,1,0,0,1,0,0][di], events: di === 3 ? [U.logEventList[0]] : di === 5 ? [U.logEventList[1]] : [], note: '', demo: true }; demo.days.push(d); }
+    if(di % 2 === 0){ S.moveLog[d] = (S.moveLog[d]||0) + 1; }
+  });
+  if(!S.meds.length){ const id = 'demo' + Date.now().toString(36); S.meds.push({ id, name: U.demoMed, times: [U.medSlots[0], U.medSlots[3]] , since: days[0] }); demo.medIds.push(id); }
+  S.meds.forEach(m => days.forEach((d, di) => { if(di === 4) return; S.medLog[d] = S.medLog[d] || {}; m.times.forEach((t, ti) => { if(!(di === 1 && ti === 1)) S.medLog[d][medKey(m.id,t)] = true; }); }));
+  demo.medLogDays = days;
+  S.demo = demo; save();
+}
+function demoClear(){
+  if(!S.demo) return;
+  S.sessions = S.sessions.filter(x => !x.demo);
+  (S.demo.days||[]).forEach(d => { if(S.logs[d] && S.logs[d].demo) delete S.logs[d]; });
+  S.meds = S.meds.filter(m => !(S.demo.medIds||[]).includes(m.id));
+  (S.demo.medLogDays||[]).forEach(d => { const lg = S.medLog[d]; if(lg){ Object.keys(lg).forEach(k => { if((S.demo.medIds||[]).some(id => k.startsWith(id+'|'))) delete lg[k]; }); } });
+  rangeDays(1,7).forEach((d, di) => { if(di % 2 === 0 && S.moveLog[d]) { S.moveLog[d]--; if(!S.moveLog[d]) delete S.moveLog[d]; } });
+  delete S.demo; save();
+}
+function demoCardHTML(){
+  if(S.demo) return `<section class="sec demo-card on" data-t="today"><p><b>${esc(U.demoOnTitle)}</b>${esc(U.demoOnSub)}</p><button class="small-btn" data-act="demo-clear">${esc(U.demoClear)}</button></section>`;
+  if(S.sessions.length) return '';
+  return `<section class="sec demo-card" data-t="today"><p><b>${esc(U.demoTitle)}</b>${esc(U.demoSub)}</p><button class="save-btn" data-act="demo-add">${esc(U.demoAdd)}</button></section>`;
+}
+let fbCat = 0;
+function deviceInfo(){
+  const ua = navigator.userAgent; let os = 'other';
+  const ios = ua.match(/OS (\d+)[_.](\d+)/); const and = ua.match(/Android (\d+(\.\d+)?)/);
+  if(/iPhone|iPad|iPod/.test(ua) && ios) os = (/iPad/.test(ua)?'iPad':'iPhone') + ' iOS ' + ios[1] + '.' + ios[2];
+  else if(and) os = 'Android ' + and[1];
+  else if(/Mac/.test(ua)) os = 'Mac'; else if(/Windows/.test(ua)) os = 'Windows';
+  const br = /CriOS|Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : /Firefox/.test(ua) ? 'Firefox' : 'browser';
+  return `${os} · ${br} · ${screen.width}×${screen.height} · ${isStandalone() ? 'home-screen app' : 'browser tab'}`;
+}
+function feedbackSecHTML(){
+  return `<h2>${esc(U.fbTitle)}<small>${esc(U.fbSub)}</small></h2>
+    <div class="chips fb-cats" role="group" aria-label="${esc(U.fbTitle)}">${U.fbCats.map((t,i)=>`<button class="chip ${fbCat===i?'on':''}" data-act="fb-cat" data-i="${i}" aria-pressed="${fbCat===i}">${esc(t)}</button>`).join('')}</div>
+    <textarea class="note" id="fbtext" maxlength="600" placeholder="${esc(U.fbPh)}"></textarea>
+    <p class="hint">${esc(U.fbAuto)}</p>
+    <button class="save-btn" data-act="fb-send" style="width:100%">${esc(U.fbSend)}</button>`;
+}
+function feedbackText(msg){
+  return `【${L.brand.name} ${U.fbTag}】${U.fbCats[fbCat]}\n${msg}\n\n— ${U.version} ${BUILD} · ${S.locale} · ${S.role||'-'} · ${S.mode} · fs ${S.fontScale}${S.hc?' · HC':''}\n— ${deviceInfo()}\n— ${new Date().toLocaleString()}`;
+}
+
 /* ---------- 下次回診想問醫生的事：平常想到就記，回診摘要一起印出來 ---------- */
 function askSecHTML(){
   const xs = S.askDoc||[];
@@ -3110,6 +3169,15 @@ document.addEventListener('click', e => {
     case 'role-elder': S.role='elder'; save(); SFX.tap(); go('play'); break;
     case 'role-family': S.role='family'; save(); go('family'); break;
     case 'to-family': go('family'); break;
+    case 'demo-add': demoAdd(); renderFamily(); toast(U.demoAdded); break;
+    case 'demo-clear': ask(U.demoClearConfirm).then(ok => { if(ok){ demoClear(); renderFamily(); toast(U.saved); } }); break;
+    case 'fb-cat': fbCat = +b.dataset.i; { const t = $('#fbtext'); const keep = t ? t.value : ''; $('#fbsec').innerHTML = feedbackSecHTML(); const n = $('#fbtext'); if(n){ n.value = keep; } } break;
+    case 'fb-send': { const t = $('#fbtext'); const msg = t ? t.value.trim() : ''; if(!msg){ toast(U.fbNeed); if(t) t.focus(); break; }
+      const text = feedbackText(msg);
+      const done = () => { toast(U.fbDone); if(t) t.value = ''; };
+      if(navigator.share){ navigator.share({ text }).then(done).catch(e => { if(e && e.name === 'AbortError') return; (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast(U.fbCopied)).catch(() => toast(U.fbCopyFail)); }); }
+      else (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => { toast(U.fbCopied); if(t) t.value = ''; }).catch(() => toast(U.fbCopyFail));
+      break; }
     case 'inst-later': S.installHide = true; save(); renderFamily(); break;
     case 'install': if(deferredInstall){ deferredInstall.prompt(); deferredInstall.userChoice.finally(()=>{ deferredInstall=null; renderFamily(); }); } break;
     case 'note-read': if(S.note){ S.note.read = Date.now(); save(); SFX.good(); render(); } break;
@@ -3196,7 +3264,7 @@ document.addEventListener('click', e => {
     case 'regen': S.familyCode = genCode(); save(); renderFamily(); break;
     case 'save': S.elderName = $('#en').value.trim(); save(); toast(U.saved); break;
     case 'log-save': { const lg=todayLog(); lg.note = $('#lognote').value.trim(); S.logs[todayKey()]=lg; save(); toast(U.logSaved); $('#logsec').innerHTML = `<h2>${esc(U.logTitle)}<small>${esc(U.logSub)}</small></h2>${logFormHTML()}${logStripHTML()}`; break; }
-    case 'reset': ask(U.resetConfirm).then(ok=>{ if(ok){ S.sessions=[]; S.levels={}; save(); renderFamily(); toast(U.saved); } }); break;
+    case 'reset': ask(U.resetConfirm).then(ok=>{ if(ok){ S.sessions=[]; S.levels={}; delete S.demo; save(); renderFamily(); toast(U.saved); } }); break;
   }
 });
 document.addEventListener('click', e => {
