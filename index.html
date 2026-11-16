@@ -1310,6 +1310,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 .demo-card.on{background:#EAF1F6}
 .fb-cats{margin:4px 0 8px}
 .sync-acts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.sync-steps{font-size:14px;color:var(--ink-2)}.sync-lbl{display:block;font-weight:700;font-size:15px;margin:12px 0 6px}#synctext{min-height:72px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -1321,7 +1322,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.42.0';
+const BUILD = '2.43.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -1351,7 +1352,7 @@ function sanitize(j){
   ['sessions','meds','photos','story','plans'].forEach(k => { if(!Array.isArray(o[k])) o[k] = []; });
   ['levels','seen','logs','medLog','storyLog','moveLog','habits','recent'].forEach(k => { if(!isObj(o[k])) o[k] = {}; });
   if('installHide' in o) o.installHide = !!o.installHide;
-  if(o.demo !== undefined){ if(!isObj(o.demo)) delete o.demo; else { ['days','medIds','medLogDays'].forEach(k => { o.demo[k] = Array.isArray(o.demo[k]) ? o.demo[k].filter(x => typeof x === 'string' && x.length < 40) : []; }); } }
+  if(o.demo !== undefined){ if(!isObj(o.demo)) delete o.demo; else { ['days','medIds','medKeys','moveDays'].forEach(k => { o.demo[k] = Array.isArray(o.demo[k]) ? o.demo[k].filter(x => typeof x === 'string' && x.length < 120).slice(0,200) : []; }); } }
   if(o.askDoc !== undefined){ o.askDoc = Array.isArray(o.askDoc) ? o.askDoc.filter(x => isObj(x) && typeof x.text === 'string' && x.text.trim()).slice(0,20).map(x => ({ id: nid(x.id), text: x.text.slice(0,80), ts: +x.ts || 0 })) : []; }
   if(o.cg !== undefined){ if(!isObj(o.cg)) o.cg = {}; Object.keys(o.cg).forEach(k => { if(!DATE_RE.test(k) || ![0,1,2].includes(o.cg[k])) delete o.cg[k]; }); }
   { const cut = new Date(Date.now()-730*864e5).toISOString().slice(0,10); ['medLog','storyLog','moveLog','habits'].forEach(k => Object.keys(o[k]).forEach(d => { if(/^\d{4}-\d\d-\d\d$/.test(d) && d < cut) delete o[k][d]; })); }
@@ -2250,7 +2251,7 @@ function renderFamily0(){
   </div></header>
   <div class="wrap">
     ${setupCardHTML()}
-    <section class="sec kpis" data-t="today">
+    <section class="sec kpis" data-t="today"${S.sessions.length ? '' : ' hidden'}>
       <div class="kpi"><div class="v">${streak()}</div><div class="l">${esc(U.streak)}</div></div>
       <div class="kpi"><div class="v">${todayAvg ?? '–'}</div><div class="l">${esc(U.today)}${esc(U.avgScore)}</div></div>
       <div class="kpi"><div class="v">${sess28.length}</div><div class="l">${esc(U.kpi28)}</div></div>
@@ -2260,7 +2261,7 @@ function renderFamily0(){
       <h2>${esc(U.todayPlate)}</h2>
       ${games.map(g=>{ const d=g in done; return `<div class="row">${gameIcon(g)}<div class="row-main"><div class="row-t">${esc(L.games[g].name)}</div><div class="row-s">${esc(L.domains[GAME_DOMAIN[g]].name)}</div></div>${d?`<span class="score">${done[g]}</span>`:`<span class="muted-s">${esc(U.notYet)}</span>`}</div>`; }).join('')}
     </section>
-    ${S.modeSet ? '' : `<section class="sec mode-sec" data-t="today">${modeChooserHTML(true)}</section>`}
+    ${S.modeSet || (!S.setupHide && SETUP.some(x=>!x[1]())) ? '' : `<section class="sec mode-sec" data-t="today">${modeChooserHTML(true)}</section>`}
     ${installCardHTML()}
     <section class="sec" id="plansec" data-t="today">${plansSecHTML()}</section>
     <section class="sec care-card" data-t="today">${YIKI_ART.mascot('care-m')}<div><div class="ct">${esc(U.careTitle)}</div><p>${esc(U.careTips[dayIndex() % U.careTips.length])}</p></div></section>
@@ -2486,12 +2487,15 @@ async function syncApply(){
   if(!save(true)){ toast(U.storageFull); return; }
   document.documentElement.style.setProperty('--fs', S.fontScale); document.documentElement.classList.toggle('hc', !!S.hc); document.documentElement.classList.toggle('gentle', S.mode !== 'active');
   if(t) t.value = '';
-  renderFamily(); toast(msg);
+  /* 在長輩手機套用完，直接回到長輩首頁，長輩不用自己找路 */
+  if(S.role === 'elder' && r.kind === 'S'){ go('play'); render(); } else renderFamily();
+  toast(msg);
 }
 function syncSecHTML(){
   return `<h2>${esc(U.syncTitle)}<small>${esc(U.syncSub)}</small></h2>
     <div class="sync-acts"><button class="save-btn" data-act="sync-s">${esc(U.syncBtnS)}</button><button class="small-btn" data-act="sync-r">${esc(U.syncBtnR)}</button></div>
     <ol class="steps-list sync-steps">${U.syncSteps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
+    ${navigator.clipboard && navigator.clipboard.readText ? `<button class="save-btn" data-act="sync-paste" style="width:100%;margin-top:12px">${esc(U.syncPasteBtn)}</button>` : ''}
     <label class="sync-lbl" for="synctext">${esc(U.syncPasteLbl)}</label>
     <textarea class="note" id="synctext" placeholder="${esc(U.syncPastePh)}" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
     <button class="small-btn" data-act="sync-apply" style="width:100%">${esc(U.syncApply)}</button>`;
@@ -2501,17 +2505,17 @@ function syncSecHTML(){
 function demoAdd(){
   if(S.demo) return;
   const days = rangeDays(1,7), games = Object.keys(L.games).filter(g => g !== 'faces' && g !== 'song');
-  const demo = { days: [], medIds: [] };
+  const demo = { days: [], medIds: [], medKeys: [], moveDays: [] };
   days.forEach((d, di) => {
     if(di === 2) return; // 留一天沒玩，看起來比較真實
     const trio = [0,1,2].map(i => games[(di*3+i) % games.length]);
     trio.forEach((g, i) => S.sessions.push({ d, g, dom: GAME_DOMAIN[g], score: 58 + ((di*17 + i*11) % 38), lvl: di > 4 ? 2 : 1, sec: 50 + i*15, daily: true, ts: new Date(d+'T10:00:00').getTime() + i*60000, demo: true }));
     if(!S.logs[d]){ S.logs[d] = { sleep: [0,1,0,2,0,1,0][di], mood: [0,0,1,1,0,0,1][di], appetite: [0,1,0,0,1,0,0][di], events: di === 3 ? [U.logEventList[0]] : di === 5 ? [U.logEventList[1]] : [], note: '', demo: true }; demo.days.push(d); }
-    if(di % 2 === 0){ S.moveLog[d] = (S.moveLog[d]||0) + 1; }
+    if(di % 2 === 0){ S.moveLog[d] = (S.moveLog[d]||0) + 1; demo.moveDays.push(d); }
   });
   if(!S.meds.length){ const id = 'demo' + Date.now().toString(36); S.meds.push({ id, name: U.demoMed, times: [U.medSlots[0], U.medSlots[3]] , since: days[0] }); demo.medIds.push(id); }
-  S.meds.forEach(m => days.forEach((d, di) => { if(di === 4) return; S.medLog[d] = S.medLog[d] || {}; m.times.forEach((t, ti) => { if(!(di === 1 && ti === 1)) S.medLog[d][medKey(m.id,t)] = true; }); }));
-  demo.medLogDays = days;
+  /* 只替「示範用藥」打勾；家人自己設的藥不碰，免得清除後留下假的服藥紀錄 */
+  S.meds.filter(m => demo.medIds.includes(m.id)).forEach(m => days.forEach((d, di) => { if(di === 4) return; S.medLog[d] = S.medLog[d] || {}; m.times.forEach((t, ti) => { const k = medKey(m.id,t); if(!(di === 1 && ti === 1) && !S.medLog[d][k]){ S.medLog[d][k] = true; demo.medKeys.push(d + '#' + k); } }); }));
   S.demo = demo; save();
 }
 function demoClear(){
@@ -2519,8 +2523,9 @@ function demoClear(){
   S.sessions = S.sessions.filter(x => !x.demo);
   (S.demo.days||[]).forEach(d => { if(S.logs[d] && S.logs[d].demo) delete S.logs[d]; });
   S.meds = S.meds.filter(m => !(S.demo.medIds||[]).includes(m.id));
-  (S.demo.medLogDays||[]).forEach(d => { const lg = S.medLog[d]; if(lg){ Object.keys(lg).forEach(k => { if((S.demo.medIds||[]).some(id => k.startsWith(id+'|'))) delete lg[k]; }); } });
-  rangeDays(1,7).forEach((d, di) => { if(di % 2 === 0 && S.moveLog[d]) { S.moveLog[d]--; if(!S.moveLog[d]) delete S.moveLog[d]; } });
+  (S.demo.medKeys||[]).forEach(dk => { const i = dk.indexOf('#'); const d = dk.slice(0,i), k = dk.slice(i+1); if(S.medLog[d]){ delete S.medLog[d][k]; if(!Object.keys(S.medLog[d]).length) delete S.medLog[d]; } });
+  Object.values(S.medLog).forEach(lg => Object.keys(lg).forEach(k => { if((S.demo.medIds||[]).some(id => k.startsWith(id+'|'))) delete lg[k]; }));
+  (S.demo.moveDays||[]).forEach(d => { if(S.moveLog[d]){ S.moveLog[d]--; if(!S.moveLog[d]) delete S.moveLog[d]; } });
   delete S.demo; save();
 }
 function demoCardHTML(){
@@ -3261,6 +3266,7 @@ document.addEventListener('click', e => {
     case 'sync-s': syncShare('S'); break;
     case 'sync-r': syncShare('R'); break;
     case 'sync-apply': syncApply(); break;
+    case 'sync-paste': navigator.clipboard.readText().then(txt => { const t = $('#synctext'); if(t) t.value = txt || ''; if(!/YK1[SR]z?\./.test(txt || '')){ toast(U.syncBad); return; } syncApply(); }).catch(() => toast(U.syncPasteFail)); break;
     case 'demo-add': demoAdd(); renderFamily(); toast(U.demoAdded); break;
     case 'demo-clear': ask(U.demoClearConfirm).then(ok => { if(ok){ demoClear(); renderFamily(); toast(U.saved); } }); break;
     case 'fb-cat': fbCat = +b.dataset.i; { const t = $('#fbtext'); const keep = t ? t.value : ''; $('#fbsec').innerHTML = feedbackSecHTML(); const n = $('#fbtext'); if(n){ n.value = keep; } } break;
