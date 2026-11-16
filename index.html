@@ -1309,6 +1309,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 .demo-card p{margin:0;flex:1;min-width:200px;font-size:15px;line-height:1.55;color:var(--ink-2)}.demo-card p b{display:block;color:var(--ink);font-size:16px;margin-bottom:2px}
 .demo-card.on{background:#EAF1F6}
 .fb-cats{margin:4px 0 8px}
+.sync-acts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}.sync-steps{font-size:14px;color:var(--ink-2)}.sync-lbl{display:block;font-weight:700;font-size:15px;margin:12px 0 6px}#synctext{min-height:72px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
 </style>
 </head>
 <body>
@@ -1320,7 +1321,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.41.0';
+const BUILD = '2.42.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -2328,6 +2329,7 @@ function renderFamily0(){
     ${S.setupHide && SETUP.some(x=>!x[1]()) ? `<section class="sec" data-t="settings"><button class="small-btn" data-act="setup-show">${esc(U.setupShow)}</button></section>` : ''}
     <section class="sec home-sec" id="homesec" data-t="settings">${homeSecHTML()}</section>
     <section class="sec hab-sec" id="habsec" data-t="settings">${habSecHTML()}</section>
+    <section class="sec sync-sec" id="syncsec" data-t="settings">${syncSecHTML()}</section>
     <section class="sec fb-sec" id="fbsec" data-t="settings">${feedbackSecHTML()}</section>
     <section class="sec install" data-t="settings">
       <h2>${esc(U.installTitle)}<small>${esc(U.installSub)}</small></h2>
@@ -2344,7 +2346,6 @@ function renderFamily0(){
       <div class="form-row"><label>${esc(U.rateLbl)}</label><div class="seg" id="rt"><button data-v="slow" class="${S.rate==='slow'?'on':''}">${esc(U.rateSlow)}</button><button data-v="normal" class="${S.rate!=='slow'?'on':''}">${esc(U.rateNormal)}</button></div></div>
       <div class="form-row"><label>${esc(U.hintLbl)}</label><div class="seg" id="ha"><button data-v="1" class="${S.hintAfter===1?'on':''}">${esc(U.hint1)}</button><button data-v="2" class="${S.hintAfter!==1?'on':''}">${esc(U.hint2)}</button></div><div class="hint">${esc(U.hintHelp)}</div></div>
       <div class="form-row"><label>${esc(U.soundLbl)}</label><div class="seg" id="sd"><button data-v="1" class="${S.sound?'on':''}">${esc(U.on)}</button><button data-v="0" class="${!S.sound?'on':''}">${esc(U.off)}</button></div></div>
-      <div class="form-row"><label>${esc(U.familyCode)}</label><div class="code"><span class="c">${esc(S.familyCode)}</span><button class="small-btn" data-act="regen">${esc(U.regenerate)}</button></div><div class="hint">${esc(U.familyCodeHint)}</div></div>
       <div class="form-row"><label>${esc(U.dataTitle)}</label><div class="hint" style="margin:0 0 8px">${esc(U.dataHint)}</div>${storageMeterHTML()}
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="small-btn" data-act="export">${esc(U.exportBtn)}</button><button class="small-btn" data-act="import">${esc(U.importBtn)}</button>${S.demo ? `<button class="small-btn" data-act="demo-clear">${esc(U.demoClear)}</button>` : `<button class="small-btn" data-act="demo-add">${esc(U.demoAdd)}</button>`}</div>
         <input type="file" id="impfile" accept="application/json,.json" hidden></div>
@@ -2408,6 +2409,94 @@ function plansSecHTML0(){
     <div class="plan-form"><input type="text" id="plantext" maxlength="30" placeholder="${esc(U.planTextPh)}">
       <div class="sf-row"><select id="planwhen" aria-label="${esc(U.planWhenLbl)}"><option value="today">${esc(U.planToday)}</option><option value="tomorrow">${esc(U.planTomorrow)}</option>${dayOpt}</select><input type="time" id="plantime" aria-label="${esc(U.planTimeLbl)}"><button class="save-btn" data-act="plan-add">${esc(U.medAdd)}</button></div></div>`;
 }
+/* ---------- 兩支手機一起用：用 LINE 互傳代碼（不用帳號、不經過伺服器）
+   家人手機 → 長輩手機：設定（用藥、行程、聯絡卡、便條、字體…）
+   長輩手機 → 家人手機：紀錄（遊戲、吃藥打勾、每日狀況、動一動…）；收到後一律經過 sanitize ---------- */
+const b64u = bytes => { let s = ''; bytes.forEach(b => s += String.fromCharCode(b)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+const unb64u = str => { const s = atob(str.replace(/-/g,'+').replace(/_/g,'/') + '==='.slice((str.length + 3) % 4)); return Uint8Array.from(s, c => c.charCodeAt(0)); };
+async function packCode(kind, obj){
+  const raw = new TextEncoder().encode(JSON.stringify(obj));
+  if(window.CompressionStream){ try{ const buf = await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer(); return `YK1${kind}z.` + b64u(new Uint8Array(buf)); }catch(_){} }
+  return `YK1${kind}.` + b64u(raw);
+}
+async function unpackCode(text){
+  const m = String(text||'').match(/YK1([SR])(z?)\.([A-Za-z0-9_-]{8,})/); if(!m) return null;
+  let bytes = unb64u(m[3]);
+  if(m[2]){ if(!window.DecompressionStream) throw new Error('nodecomp'); bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); }
+  const obj = JSON.parse(new TextDecoder().decode(bytes)); if(!obj || typeof obj !== 'object') return null;
+  return { kind: m[1], obj };
+}
+function settingsPayload(){ return { v:1, fc:S.familyCode, n:S.elderName, meds:S.meds.filter(m => !(S.demo && (S.demo.medIds||[]).includes(m.id))), plans:S.plans, sos:S.sos||null, note:S.note ? { text:S.note.text, from:S.note.from, ts:S.note.ts } : null, mode:S.mode, fontScale:S.fontScale, rate:S.rate, hintAfter:S.hintAfter, hab:S.hab||null, homeHide:S.homeHide||[], voice:S.voice, sound:S.sound, hc:S.hc, ts:Date.now() }; }
+function recordsPayload(days = 14){
+  /* LINE 一則訊息最多 5000 字：預設帶最近兩週，太長會自動縮短（見 syncShare） */
+  const keep = new Set(lastNDays(days)); const pick = o => Object.fromEntries(Object.entries(o||{}).filter(([k]) => keep.has(k)));
+  const logs = {}; Object.entries(pick(S.logs)).forEach(([k,l]) => { if(!l.demo) logs[k] = { sleep:l.sleep, mood:l.mood, appetite:l.appetite, events:l.events, note:l.note }; });
+  return { v:1, fc:S.familyCode, ss:S.sessions.filter(x => !x.demo && keep.has(x.d)).map(x => [x.d, x.g, x.score, x.lvl, x.sec, x.daily ? 1 : 0, x.ts]), medLog:pick(S.medLog), logs, moveLog:pick(S.moveLog), storyLog:pick(S.storyLog), habits:pick(S.habits), levels:S.levels, heard: S.note && S.note.heard ? S.note.ts : null, ts:Date.now() };
+}
+function applySettings(o){
+  const n = JSON.parse(JSON.stringify(S));
+  if(typeof o.n === 'string') n.elderName = o.n;
+  if(Array.isArray(o.meds)) n.meds = o.meds;
+  if(Array.isArray(o.plans)) n.plans = o.plans;
+  if(o.sos) n.sos = o.sos;
+  if(o.note && o.note.text && (!n.note || (+o.note.ts||0) > (+n.note.ts||0))) n.note = { text:o.note.text, from:o.note.from, ts:o.note.ts };
+  ['mode','fontScale','rate','hintAfter','voice','sound','hc'].forEach(k => { if(k in o) n[k] = o[k]; });
+  if(o.hab) n.hab = o.hab; if(Array.isArray(o.homeHide)) n.homeHide = o.homeHide;
+  if(typeof o.fc === 'string') n.familyCode = o.fc;
+  n.modeSet = true;
+  return n;
+}
+function applyRecords(o){
+  const n = JSON.parse(JSON.stringify(S)); let added = 0;
+  const have = new Set(n.sessions.map(x => x.g + '|' + x.ts));
+  const sess = Array.isArray(o.ss) ? o.ss.filter(Array.isArray).map(a => ({ d:a[0], g:a[1], dom:GAME_DOMAIN[a[1]]||'', score:a[2], lvl:a[3], sec:a[4], daily:!!a[5], ts:a[6] })) : (Array.isArray(o.sessions) ? o.sessions : []);
+  sess.forEach(x => { if(x && typeof x === 'object' && !have.has(x.g + '|' + x.ts)){ n.sessions.push(x); have.add(x.g + '|' + x.ts); added++; } });
+  n.sessions.sort((a,b) => (a.ts||0) - (b.ts||0));
+  const isO = v => v && typeof v === 'object' && !Array.isArray(v);
+  if(isO(o.medLog)) Object.entries(o.medLog).forEach(([d,lg]) => { if(isO(lg)){ n.medLog[d] = Object.assign({}, n.medLog[d]||{}, lg); } });
+  if(isO(o.logs)) Object.entries(o.logs).forEach(([d,l]) => { if(!n.logs[d] && isO(l)) n.logs[d] = l; });
+  ['moveLog','storyLog'].forEach(k => { if(isO(o[k])) Object.entries(o[k]).forEach(([d,v]) => { n[k][d] = Math.max(+n[k][d]||0, +v||0); }); });
+  if(isO(o.habits)) Object.entries(o.habits).forEach(([d,arr]) => { if(Array.isArray(arr)) n.habits[d] = [...new Set([...(n.habits[d]||[]), ...arr])]; });
+  if(isO(o.levels)) n.levels = Object.assign({}, n.levels, o.levels);
+  if(o.heard && n.note && n.note.ts === o.heard) n.note.heard = true;
+  return { n, added };
+}
+async function syncShare(kind){
+  try{
+    let code = await packCode(kind, kind === 'S' ? settingsPayload() : recordsPayload(14));
+    if(kind === 'R') for(const d of [7, 3, 1]){ if(code.length <= 4600) break; code = await packCode('R', recordsPayload(d)); }
+    const text = (kind === 'S' ? U.syncMsgS : U.syncMsgR) + '\n' + code;
+    if(navigator.share){ try{ await navigator.share({ text }); return; }catch(e){ if(e && e.name === 'AbortError') return; } }
+    await navigator.clipboard.writeText(text); toast(U.syncCopied);
+  }catch(_){ toast(U.fbCopyFail); }
+}
+async function syncApply(){
+  const t = $('#synctext'); const raw = t ? t.value : '';
+  let r; try{ r = await unpackCode(raw); }catch(_){ r = null; }
+  if(!r){ toast(U.syncBad); return; }
+  const o = r.obj;
+  const goOn = (o.fc && S.familyCode && o.fc !== S.familyCode && (S.sessions.length || S.meds.length) && r.kind === 'R') ? await ask(U.syncOtherFamily) : true;
+  if(!goOn) return;
+  const ok = r.kind === 'S' ? await ask(U.syncConfirmS) : true;
+  if(!ok) return;
+  let msg;
+  if(r.kind === 'S'){ S = sanitize(applySettings(o)); msg = U.syncDoneS; }
+  else { const res = applyRecords(o); S = sanitize(res.n); msg = U.syncDoneR(res.added); }
+  normalizeMedSlots();
+  if(!save(true)){ toast(U.storageFull); return; }
+  document.documentElement.style.setProperty('--fs', S.fontScale); document.documentElement.classList.toggle('hc', !!S.hc); document.documentElement.classList.toggle('gentle', S.mode !== 'active');
+  if(t) t.value = '';
+  renderFamily(); toast(msg);
+}
+function syncSecHTML(){
+  return `<h2>${esc(U.syncTitle)}<small>${esc(U.syncSub)}</small></h2>
+    <div class="sync-acts"><button class="save-btn" data-act="sync-s">${esc(U.syncBtnS)}</button><button class="small-btn" data-act="sync-r">${esc(U.syncBtnR)}</button></div>
+    <ol class="steps-list sync-steps">${U.syncSteps.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
+    <label class="sync-lbl" for="synctext">${esc(U.syncPasteLbl)}</label>
+    <textarea class="note" id="synctext" placeholder="${esc(U.syncPastePh)}" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <button class="small-btn" data-act="sync-apply" style="width:100%">${esc(U.syncApply)}</button>`;
+}
+
 /* ---------- 試用：範例資料（看看用了一週的樣子，可一鍵清除）＋ App 內回報問題 ---------- */
 function demoAdd(){
   if(S.demo) return;
@@ -3169,6 +3258,9 @@ document.addEventListener('click', e => {
     case 'role-elder': S.role='elder'; save(); SFX.tap(); go('play'); break;
     case 'role-family': S.role='family'; save(); go('family'); break;
     case 'to-family': go('family'); break;
+    case 'sync-s': syncShare('S'); break;
+    case 'sync-r': syncShare('R'); break;
+    case 'sync-apply': syncApply(); break;
     case 'demo-add': demoAdd(); renderFamily(); toast(U.demoAdded); break;
     case 'demo-clear': ask(U.demoClearConfirm).then(ok => { if(ok){ demoClear(); renderFamily(); toast(U.saved); } }); break;
     case 'fb-cat': fbCat = +b.dataset.i; { const t = $('#fbtext'); const keep = t ? t.value : ''; $('#fbsec').innerHTML = feedbackSecHTML(); const n = $('#fbtext'); if(n){ n.value = keep; } } break;
