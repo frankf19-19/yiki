@@ -11,8 +11,9 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="憶起玩">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <script>/* 只載入目前語言的字型與文字；第一次使用依手機語言決定 */
 (function(){var C=['zh-TW','ja-JP','ko-KR','en-US','en-CA'],l;
 try{l=(JSON.parse(localStorage.getItem('yiki.v1'))||{}).locale;}catch(e){}
@@ -1303,6 +1304,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 .inst-card .ic img{width:100%;height:100%;display:block}
 .inst-card .tx{flex:1;min-width:0}.inst-card .tx b{display:block;font-size:16px;margin-bottom:4px}.inst-card .tx p{margin:0 0 10px;font-size:14px;line-height:1.55;color:var(--ink-2)}
 .inst-card .acts{display:flex;gap:8px;flex-wrap:wrap}
+.brand-ic{width:30px;height:30px;border-radius:8px;vertical-align:-6px;margin-right:8px;border:1.5px solid var(--ink)}
 </style>
 </head>
 <body>
@@ -1314,7 +1316,7 @@ body.elder input,body.elder textarea{-webkit-user-select:text;user-select:text}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.39.0';
+const BUILD = '2.40.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -1659,7 +1661,7 @@ function renderPlayHome(){
   app.innerHTML = `
   <div class="screen home"><div class="wrap">
     <header class="nav">
-      <div class="brand wordmark">${esc(L.brand.name)}</div>
+      <div class="brand wordmark"><img class="brand-ic" src="icons/icon-192.png" alt="">${esc(L.brand.name)}</div>
       <span class="nav-r">${sosReady()?`<button class="nav-btn help-pill" data-act="help-open">${ico('phone')}<span>${esc(U.helpShort)}</span></button>`:''}<button class="nav-btn" data-act="to-family">${ico('users')}<span>${esc(U.switchToFamily)}</span></button></span>
     </header>
     ${homeShow('orient')?orientBoardHTML():''}
