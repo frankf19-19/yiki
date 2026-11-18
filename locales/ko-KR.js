@@ -405,6 +405,7 @@ window.YIKI_LOCALES['ko-KR'] = {
     planEdTitle: "어르신 일정",
     planEdSub: "어르신 홈 화면의 \"오늘 할 일\"에 보여요",
     planTextPh: "예: 아들이 와요, 주간보호센터, 병원 진료",
+    exportHeld: "이번에는 사진을 불러오지 못해서 지금 백업하면 사진이 빠져요. 앱을 닫았다가 다시 연 뒤 백업해 주세요.",
     remindTitle: "약 드실 시간이에요",
     remindBody: n=>`${n} 약이에요. 드신 뒤 Yiki에서 체크해 주세요`,
     planOpen: "요금제와 체험",

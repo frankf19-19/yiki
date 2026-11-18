@@ -405,6 +405,7 @@ window.YIKI_LOCALES['ja-JP'] = {
     planEdTitle: "ご本人の予定",
     planEdSub: "ご本人のホームの「今日の予定」に表示されます",
     planTextPh: "例：息子が来る、デイサービス、通院",
+    exportHeld: "今回は写真を読み込めなかったため、いまバックアップすると写真が含まれません。アプリを閉じて開き直してから、もう一度お試しください。",
     remindTitle: "お薬の時間です",
     remindBody: n=>`${n}のお薬です。飲んだら Yiki でチェックしましょう`,
     planOpen: "プランとお試し",

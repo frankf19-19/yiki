@@ -1373,7 +1373,7 @@ html.hc .plan-card.fam,html.hc .plan-card.always{background:#fff}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.46.0';
+const BUILD = '2.46.1';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -3530,7 +3530,7 @@ document.addEventListener('click', e => {
     case 'story-del': ask(U.medDelConfirm(((S.story||[]).find(x=>x.id===b.dataset.id)||{}).text||'')).then(ok=>{ if(ok){ S.story=S.story.filter(x=>x.id!==b.dataset.id); save(); $('#storysec').innerHTML=storySecHTML(); } }); break;
     case 'photo-add': { const nm=$('#phname').value.trim(); if(!nm){ toast(U.photoNamePh); $('#phname').focus(); break; } if((S.photos||[]).length>=16){ toast(U.photoTooMany); break; } pendingPhotoName=nm; $('#phfile').click(); break; }
     case 'photo-del': ask(U.medDelConfirm((S.photos.find(x=>x.id===b.dataset.id)||{}).name||'')).then(ok=>{ if(ok){ S.photos=S.photos.filter(x=>x.id!==b.dataset.id); save(); $('#photosec').innerHTML=photosSecHTML(); } }); break;
-    case 'export': { try{ const blob=new Blob([JSON.stringify({app:'yiki',build:BUILD,data:S})],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yiki-backup-'+todayKey()+'.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); toast(U.exported); }catch(_){ toast(U.importFail); } break; }
+    case 'export': { if(HELD.photos.length || HELD.story.length || Object.keys(HELD.audio).length){ toast(U.exportHeld); break; } try{ const blob=new Blob([JSON.stringify({app:'yiki',build:BUILD,data:S})],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yiki-backup-'+todayKey()+'.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); toast(U.exported); }catch(_){ toast(U.importFail); } break; }
     case 'import': { const f=$('#impfile'); if(f) f.click(); break; }
     case 'regen': S.familyCode = genCode(); save(); renderFamily(); break;
     case 'save': S.elderName = $('#en').value.trim(); save(); toast(U.saved); break;

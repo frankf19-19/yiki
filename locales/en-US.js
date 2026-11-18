@@ -404,6 +404,7 @@ window.YIKI_LOCALES['en-US'] = {
     planEdTitle: "Their schedule",
     planEdSub: "Shows on the “today” board on their home screen",
     planTextPh: "e.g. Sarah visits, Adult day program, Doctor visit",
+    exportHeld: "Photos could not be loaded this time, so a backup made now would leave them out. Close the app, open it again, then back up.",
     remindTitle: "Time for medicine",
     remindBody: n=>`${n} medicine. Open Yiki and tick it off after taking it.`,
     planOpen: "Plans and trial",

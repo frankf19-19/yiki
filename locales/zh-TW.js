@@ -415,6 +415,7 @@ window.YIKI_LOCALES['zh-TW'] = {
     planEdTitle: "長輩的行程",
     planEdSub: "會出現在長輩首頁的小看板，幫他知道今天要做什麼",
     planTextPh: "例如：兒子來看你、去日照中心、回診",
+    exportHeld: "照片這次沒有讀出來，現在備份會少掉照片。請把 App 關掉再打開，然後再備份一次。",
     remindTitle: "吃藥時間到了",
     remindBody: n=>`${({早:'早上',中:'中午',晚:'晚上'})[n]||n}的藥，吃了記得打開憶起玩打個勾`,
     planOpen: "方案與試用",
