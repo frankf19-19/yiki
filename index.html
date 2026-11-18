@@ -1346,6 +1346,22 @@ html.hc .screen.move .actions,html.hc .screen.calm .actions{background:linear-gr
   .calm-photo{max-width:min(340px,30vh)}
   .breath-wrap .breath{width:150px;height:150px}
 }
+.plan-now{font-size:calc(17px*var(--fs));line-height:1.6;margin:0 0 16px;color:var(--ink-2)}
+.plan-card h2{margin:0 0 4px}.plan-card.fam{background:#FFF8DC}.plan-card.always{background:#EAF3E3}
+.plan-card.always p{margin:6px 0 0;line-height:1.6}
+.plan-price{font-size:calc(18px*var(--fs));font-weight:700;margin:2px 0 8px}
+.plan-list{list-style:none;margin:8px 0 14px;padding:0;display:flex;flex-direction:column;gap:8px}
+.plan-list li{display:flex;gap:10px;align-items:flex-start;line-height:1.45;font-size:calc(16px*var(--fs))}
+.plan-list .ico{width:20px;height:20px;flex:none;margin-top:2px;color:var(--ok)}
+.plan-card .big-btn{width:100%}.plan-card .hint{margin:10px 0 0}
+.trial-state{margin:4px 0 0;padding:12px 14px;border-radius:14px;background:var(--card);border:var(--edge);font-weight:700;line-height:1.5}
+.plan-draft{text-align:center;margin:4px 0 0}
+.plan-entry{display:flex;align-items:center;gap:12px}.plan-entry .row-main{flex:1;min-width:0}.plan-entry .save-btn{flex:none}
+html.hc .plan-card.fam,html.hc .plan-card.always{background:#fff}
+.med-row{flex-wrap:wrap}.med-row .nm{flex:1 1 9em;min-width:0;overflow-wrap:anywhere}
+.med-row>div:last-child{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+.med-row .st{flex-wrap:wrap;justify-content:flex-end}
+.med-row .st i{width:auto;min-width:26px;padding:0 8px;border-radius:999px!important;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1353,16 +1369,15 @@ html.hc .screen.move .actions,html.hc .screen.calm .actions{background:linear-gr
 <script src="art.js"></script>
 <script>document.body.insertAdjacentHTML("afterbegin", YIKI_ART.defs);</script>
 <script>(function(l){document.write((l==='en-CA'?'<script src="locales/en-US.js"><\/script>':'')+'<script src="locales/'+l+'.js"><\/script>');})(window.YIKI_BOOT_LOCALE||'zh-TW');</script>
-<script>
+<script type="text/plain" id="yiki-app">
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.45.0';
+const BUILD = '2.46.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
 const defaults = () => ({ locale:(window.YIKI_BOOT_LOCALE||'zh-TW'), role:null, elderName:'', familyCode:genCode(), voice:true, sound:true, fontScale:1, hc:false, levels:{}, sessions:[], seen:{}, logs:{}, meds:[], medLog:{}, photos:[], note:null, mode:'gentle', modeSet:false, story:[], storyLog:{}, plans:[] });
-let S = load();
 /* 讀進來的資料一律整理成正確格式（舊版資料、手動改過或不完整的備份都不會讓 App 壞掉） */
 function sanitize(j){
   const d = defaults(); if(!j || typeof j !== 'object' || Array.isArray(j)) return d;
@@ -1388,6 +1403,7 @@ function sanitize(j){
   ['levels','seen','logs','medLog','storyLog','moveLog','habits','recent'].forEach(k => { if(!isObj(o[k])) o[k] = {}; });
   if('installHide' in o) o.installHide = !!o.installHide;
   if(o.demo !== undefined){ if(!isObj(o.demo)) delete o.demo; else { ['days','medIds','medKeys','moveDays'].forEach(k => { o.demo[k] = Array.isArray(o.demo[k]) ? o.demo[k].filter(x => typeof x === 'string' && x.length < 120).slice(0,200) : []; }); } }
+  if(o.trial !== undefined){ if(isObj(o.trial) && typeof o.trial.start === 'string' && DATE_RE.test(o.trial.start)) o.trial = { start: o.trial.start }; else delete o.trial; }
   if(o.askDoc !== undefined){ o.askDoc = Array.isArray(o.askDoc) ? o.askDoc.filter(x => isObj(x) && typeof x.text === 'string' && x.text.trim()).slice(0,20).map(x => ({ id: nid(x.id), text: x.text.slice(0,80), ts: +x.ts || 0 })) : []; }
   if(o.cg !== undefined){ if(!isObj(o.cg)) o.cg = {}; Object.keys(o.cg).forEach(k => { if(!DATE_RE.test(k) || ![0,1,2].includes(o.cg[k])) delete o.cg[k]; }); }
   { const cut = new Date(Date.now()-730*864e5).toISOString().slice(0,10); ['medLog','storyLog','moveLog','habits'].forEach(k => Object.keys(o[k]).forEach(d => { if(/^\d{4}-\d\d-\d\d$/.test(d) && d < cut) delete o[k][d]; })); }
@@ -1411,14 +1427,72 @@ function sanitize(j){
   if(o.hab !== undefined){ if(!isObj(o.hab)) delete o.hab; else { if(Array.isArray(o.hab.keys)) o.hab.keys = o.hab.keys.filter(k => ['walk','chat','brain','bp','glasses','ear'].includes(k)); if('on' in o.hab && typeof o.hab.on !== 'boolean') delete o.hab.on; } }
   return o;
 }
+/* 照片與錄音：記憶體裡的 S 一樣放完整內容；存檔時換成「idb:代號」，內容另外放 IndexedDB */
+const MEDIA = window.YIKI_MEDIA || { ok:false, map:{} };
+const mediaConfirmed = new Map(Object.entries(MEDIA.map)), mediaFlight = new Map();
+const HELD = { photos:[], story:[], audio:{} };
+const isRef = v => typeof v === 'string' && v.startsWith('idb:');
+const idbUsable = () => !!window.yikiIDB && !!window.indexedDB && MEDIA.ok !== false && !MEDIA.dead;
+const mediaKey = (pre, id, v) => pre + id + ':' + v.length + ':' + v.slice(-12);
+function hydrate(o){
+  if(!o || typeof o !== 'object') return o;
+  HELD.photos = []; HELD.story = []; HELD.audio = {};
+  const get = v => { const k = v.slice(4); return Object.prototype.hasOwnProperty.call(MEDIA.map, k) ? MEDIA.map[k] : undefined; };
+  const fix = (arr, held) => !Array.isArray(arr) ? arr : arr.filter(x => {
+    if(!x || typeof x !== 'object') return true;
+    if(isRef(x.img)){ const v = get(x.img); if(v === undefined){ if(MEDIA.ok === false) held.push(x); return false; } x.img = v; }
+    if(isRef(x.audio)){ const v = get(x.audio); if(v === undefined){ if(MEDIA.ok === false) HELD.audio[x.id] = x.audio; x.audio = null; } else x.audio = v; }
+    return true; });
+  o.photos = fix(o.photos, HELD.photos); o.story = fix(o.story, HELD.story);
+  if(o.note && typeof o.note === 'object' && isRef(o.note.audio)){ const v = get(o.note.audio); if(v === undefined){ if(MEDIA.ok === false) HELD.audio['@note'] = o.note.audio; o.note.audio = null; } else o.note.audio = v; }
+  return o;
+}
+function slimState(all){
+  const pend = [], used = new Set(), can = idbUsable();
+  const ref = (pre, id, v) => { if(typeof v !== 'string' || !v) return v; const k = mediaKey(pre, id, v); used.add(k); if(mediaConfirmed.get(k) === v) return 'idb:' + k; if(!can) return v; pend.push([k, v]); return all ? 'idb:' + k : v; };
+  const o = Object.assign({}, S);
+  o.photos = (S.photos||[]).map(x => Object.assign({}, x, { img: ref('p:', x.id, x.img) })).concat(HELD.photos);
+  o.story = (S.story||[]).map(x => { const y = Object.assign({}, x, { img: ref('s:', x.id, x.img) }); if(x.audio) y.audio = ref('sa:', x.id, x.audio); else if(HELD.audio[x.id]) y.audio = HELD.audio[x.id]; return y; }).concat(HELD.story);
+  if(S.note){ o.note = Object.assign({}, S.note); if(S.note.audio) o.note.audio = ref('n:', '', S.note.audio); else if(HELD.audio['@note'] && S.note.audio === null) o.note.audio = HELD.audio['@note']; }
+  HELD.photos.concat(HELD.story).forEach(x => { [x.img, x.audio].forEach(v => { if(isRef(v)) used.add(v.slice(4)); }); }); Object.values(HELD.audio).forEach(v => used.add(v.slice(4)));
+  return { o, pend, used };
+}
+let mediaBusy = Promise.resolve();
+function flushMedia(pend, risky){
+  const todo = pend.filter(([k, v]) => mediaFlight.get(k) !== v); if(!todo.length) return;
+  todo.forEach(([k, v]) => mediaFlight.set(k, v));
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(_){}
+  mediaBusy = mediaBusy.then(() => window.yikiIDB.put(todo)).then(() => {
+    todo.forEach(([k, v]) => { mediaConfirmed.set(k, v); MEDIA.map[k] = v; mediaFlight.delete(k); });
+    if(MEDIA.ok === 'lazy') MEDIA.ok = true;
+    const st = slimState(false); try{ localStorage.setItem(STORE_KEY, JSON.stringify(st.o)); }catch(_){}
+    mediaGC(st.used);
+  }).catch(() => { todo.forEach(([k]) => mediaFlight.delete(k)); MEDIA.dead = true; if(risky){ try{ toast(U.storageFull); }catch(_){} } });
+}
+function mediaGC(used){
+  if(!idbUsable() || mediaFlight.size) return;
+  const drop = [...mediaConfirmed.keys()].filter(k => !used.has(k)); if(!drop.length) return;
+  drop.forEach(k => { mediaConfirmed.delete(k); delete MEDIA.map[k]; });
+  mediaBusy = mediaBusy.then(() => window.yikiIDB.del(drop)).catch(()=>{});
+}
 function load(){
   let raw = null; try{ raw = localStorage.getItem(STORE_KEY); }catch(_){ return defaults(); }
   if(!raw) return defaults();
-  try{ return sanitize(JSON.parse(raw)); }
+  try{ return sanitize(hydrate(JSON.parse(raw))); }
   catch(e){ try{ localStorage.setItem(STORE_KEY+'.broken-'+Date.now(), raw); }catch(_){} console.warn('yiki: stored data unreadable, kept a copy', e); return defaults(); }
 }
+let S = load();
 let saveWarned = false;
-function save(quiet){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); return true; }catch(e){ if(!quiet && !saveWarned){ saveWarned = true; setTimeout(()=>{ try{ toast(U.storageFull); }catch(_){} }, 50); } return false; } }
+function save(quiet){
+  /* 新的照片／錄音先連同內容存一次（保險），等 IndexedDB 寫好再換成代號；localStorage 放不下時直接用代號 */
+  const st = slimState(false); let ok = false, risky = false;
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(st.o)); ok = true; }
+  catch(e){ if(st.pend.length){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(slimState(true).o)); ok = true; risky = true; }catch(_){} } }
+  if(!ok){ if(!quiet && !saveWarned){ saveWarned = true; setTimeout(()=>{ try{ toast(U.storageFull); }catch(_){} }, 50); } return false; }
+  if(st.pend.length) flushMedia(st.pend, risky); else mediaGC(st.used);
+  clearTimeout(save.rt); save.rt = setTimeout(() => { try{ syncReminders(); }catch(_){} }, 400);
+  return true;
+}
 function genCode(){ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=a[Math.floor(Math.random()*a.length)]; return s; }
 let L = window.YIKI_LOCALES[S.locale] || window.YIKI_LOCALES[window.YIKI_BOOT_LOCALE] || Object.values(window.YIKI_LOCALES)[0];
 const U = L.ui;
@@ -1610,6 +1684,11 @@ setInterval(clockCheck, 60000);
 /* 同一台裝置開了兩個分頁：另一頁存檔後，這頁跟著更新，避免舊資料把新資料蓋掉 */
 window.addEventListener('storage', e => {
   if(e.key !== 'yiki.v1' || e.newValue == null) return;
+  const need = [...new Set((String(e.newValue).match(/"idb:[^"]+"/g)||[]).map(x => x.slice(5, -1)))].filter(k => !Object.prototype.hasOwnProperty.call(MEDIA.map, k));
+  if(need.length && idbUsable()) window.yikiIDB.get(need).then(m => { Object.keys(m).forEach(k => { MEDIA.map[k] = m[k]; mediaConfirmed.set(k, m[k]); }); }).catch(()=>{}).then(storageApply);
+  else storageApply();
+});
+function storageApply(){
   const prevLocale = S.locale; S = load();
   if(S.locale !== prevLocale){ location.reload(); return; }
   document.documentElement.style.setProperty('--fs', S.fontScale);
@@ -1619,7 +1698,7 @@ window.addEventListener('storage', e => {
   const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if(['game','move','calm','celebrate','help'].includes(h) || typing || recState || document.querySelector('.modal, .ask')) return;
   const y = window.scrollY; render(); window.scrollTo(0, y);
-});
+}
 document.addEventListener('visibilitychange', () => { if(!document.hidden) clockCheck(); });
 
 let lastRoute = null;
@@ -1634,6 +1713,7 @@ function render(){
   if(gameCtl && h !== 'game'){ gameCtl.dead = true; if(gameCtl.cleanup) gameCtl.cleanup(); gameCtl = null; hush(); if(typeof stopMelody==='function') stopMelody(); }
   if(h === 'family') return renderFamily();
   if(h === 'summary') return renderSummary();
+  if(h === 'plan') return renderPlan();
   if(h === 'play') return renderPlayHome();
   if(h === 'pick') return renderPick();
   if(h === 'story') return renderStory();
@@ -2288,7 +2368,7 @@ function renderFamily0(){
     ${setupCardHTML()}
     <section class="sec kpis" data-t="today"${S.sessions.length ? '' : ' hidden'}>
       <div class="kpi"><div class="v">${streak()}</div><div class="l">${esc(U.streak)}</div></div>
-      <div class="kpi"><div class="v">${todayAvg ?? '–'}</div><div class="l">${esc(U.today)}${esc(U.avgScore)}</div></div>
+      <div class="kpi"><div class="v">${todayAvg ?? '–'}</div><div class="l">${esc(U.today)}${/^(en|ko)/.test(S.locale)?' ':''}${esc(U.avgScore)}</div></div>
       <div class="kpi"><div class="v">${sess28.length}</div><div class="l">${esc(U.kpi28)}</div></div>
     </section>
     ${demoCardHTML()}
@@ -2365,6 +2445,7 @@ function renderFamily0(){
     ${S.setupHide && SETUP.some(x=>!x[1]()) ? `<section class="sec" data-t="settings"><button class="small-btn" data-act="setup-show">${esc(U.setupShow)}</button></section>` : ''}
     <section class="sec home-sec" id="homesec" data-t="settings">${homeSecHTML()}</section>
     <section class="sec hab-sec" id="habsec" data-t="settings">${habSecHTML()}</section>
+    <section class="sec plan-entry" data-t="settings"><div class="row-main"><div class="row-t">${esc(U.planFamT)}</div><div class="row-s">${esc(trialLeft() > 0 ? U.trialOn(trialLeft()) : U.planCardS)}</div></div><button class="save-btn" data-act="plan-open">${esc(U.planOpen)}</button></section>
     <section class="sec sync-sec" id="syncsec" data-t="settings">${syncSecHTML()}</section>
     <section class="sec fb-sec" id="fbsec" data-t="settings">${feedbackSecHTML()}</section>
     <section class="sec install" data-t="settings">
@@ -2390,13 +2471,13 @@ function renderFamily0(){
         <button class="save-btn" data-act="save">${esc(U.save)}</button>
       </div>
     </section>
-    <div class="foot" data-t="settings">${esc(U.disclaimer)}<br>${esc(L.brand.name)} ${esc(L.brand.latin)} · ${esc(U.version)} ${BUILD}</div>
+    <div class="foot" data-t="settings">${esc(U.disclaimer)}<br><a href="privacy.html?lang=${S.locale.slice(0,2)}" target="_blank" rel="noopener" style="color:inherit">${esc(U.privacyLink)}</a><br>${esc(L.brand.name)} ${esc(L.brand.latin)} · ${esc(U.version)} ${BUILD}</div>
   </div>
   <nav class="tabbar">${FAM_TABS.map(([k,ic])=>`<button data-act="tab" data-tab="${k}" class="${famTab===k?'on':''}">${ico(ic)}<span>${esc(U.tabs[k])}</span></button>`).join('')}</nav>
   </div>`;
   attachTooltips();
 }
-function storageUse(){ try{ const n = (localStorage.getItem(STORE_KEY)||'').length; return { mb: n*2/1048576, pct: Math.min(100, Math.round(n/2500000*100)) }; }catch(_){ return null; } }
+function storageUse(){ try{ const n = (localStorage.getItem(STORE_KEY)||'').length; let m = 0; mediaConfirmed.forEach(v => { m += v.length; }); return { mb: (n*2 + m)/1048576, pct: Math.min(100, Math.round(Math.max(n/2500000, m/250e6)*100)) }; }catch(_){ return null; } }
 function storageMeterHTML(){ const u = storageUse(); if(!u) return '';
   return `<div class="meter-row"><div class="meter${u.pct>=80?' warn':''}" role="img" aria-label="${esc(U.storageUse(u.pct))}"><i style="width:${Math.max(2,u.pct)}%"></i></div><div class="hint" style="margin:4px 0 10px">${esc(U.storageUse(u.pct))}${u.pct>=80?'<br>'+esc(U.storageTip):''}</div></div>`; }
 const LOG_FIELDS = [['sleep','moon',()=>U.logSleep],['mood','smile',()=>U.logMood],['appetite','bowl',()=>U.logAppetite]];
@@ -2635,6 +2716,23 @@ function askSecHTML(){
 
 /* ---------- 大字週曆（印出來貼冰箱／床邊）：接下來 7 天的行程、吃藥打勾格、需要幫忙打給誰
    依據：現實導向（年月日、星期、今天要做什麼）對認知有小到中等改善；紙本不用開手機也看得到 ---------- */
+/* 方案與試用：先做畫面和流程，還沒有金流，也不鎖任何功能 */
+const TRIAL_DAYS = 14;
+function trialLeft(){ if(!S.trial || !S.trial.start) return null; const d = Math.round((new Date(todayKey()+'T00:00:00') - new Date(S.trial.start+'T00:00:00'))/864e5); return d < 0 ? TRIAL_DAYS : Math.max(0, TRIAL_DAYS - d); }
+function renderPlan(){
+  document.body.className = 'family';
+  const left = trialLeft(), li = xs => xs.map(x => `<li>${ico('check')}<span>${esc(x)}</span></li>`).join('');
+  app.innerHTML = `<div class="screen plan"><div class="wrap">
+    <header class="nav"><button class="nav-back" data-act="plan-back">${ico('chevL')}<span>${esc(U.summaryBack)}</span></button><div></div></header>
+    <h1 class="page-title">${esc(U.planTitle)}</h1>
+    <p class="plan-now">${esc(U.planNow)}</p>
+    <section class="sec plan-card fam"><h2>${esc(U.planFamT)}</h2><p class="plan-price">${esc(U.planPrice)}</p><ul class="plan-list">${li(U.planFamItems)}</ul>
+      ${left === null ? `<button class="big-btn primary" data-act="trial-start"><span>${esc(U.trialBtn)}</span></button><p class="hint">${esc(U.trialHint)}</p>` : `<p class="trial-state" role="status">${esc(left > 0 ? U.trialOn(left) : U.trialEnded)}</p>`}</section>
+    <section class="sec plan-card"><h2>${esc(U.planFreeT)}</h2><ul class="plan-list">${li(U.planFreeItems)}</ul></section>
+    <section class="sec plan-card always"><h2>${esc(U.planAlwaysT)}</h2><p>${esc(U.planAlways)}</p></section>
+    <p class="hint plan-draft">${esc(U.planDraft)}</p>
+  </div></div>`;
+}
 function renderWall(){
   document.body.className = 'family wall-mode';
   const days = Array.from({length:7}, (_,i) => { const d = new Date(); d.setDate(d.getDate()+i); return d; });
@@ -3191,7 +3289,7 @@ function shrinkImage(file, max=360){ return new Promise((res,rej)=>{ const rd=ne
   rd.readAsDataURL(file); }); }
 function medsManageHTML(){
   const lg = medToday(), days = lastNDays(7), rate = medTakenRate(days);
-  return (S.meds.length ? S.meds.map(m=>`<div class="med-row"><div class="nm">${esc(m.name)}<small>${esc(m.times.join('、'))}</small></div>
+  return (S.meds.length ? S.meds.map(m=>`<div class="med-row"><div class="nm">${esc(m.name)}<small>${esc(m.times.join(/^(en|ko)/.test(S.locale)?', ':'、'))}</small></div>
       <div style="display:flex;align-items:center;gap:10px"><span class="st">${m.times.map(t=>`<i class="${lg[medKey(m.id,t)]?'on':''}" title="${esc(t)}">${esc(t)}</i>`).join('')}</span>
       <button class="small-btn" data-act="med-del" data-id="${esc(m.id)}">${esc(U.medDelete)}</button></div></div>`).join('') : `<div class="empty">${esc(U.medEmpty)}</div>`) +
     (S.meds.length ? `<div class="hint" style="margin-top:8px">${esc(U.medAdherence)}：<b style="color:var(--brand)">${rate===null?'–':rate+'%'}</b></div>` : '') +
@@ -3227,7 +3325,7 @@ function renderSummary(){
     <table><tr><th></th>${U.logLevels.map(t=>`<th>${esc(t)}</th>`).join('')}</tr>${distRow(U.logSleep,'sleep')}${distRow(U.logMood,'mood')}${distRow(U.logAppetite,'appetite')}</table>
     <h2>${esc(U.sumEvents)}</h2>
     ${Object.keys(evCount).length ? `<table>${Object.entries(evCount).sort((a,b)=>b[1]-a[1]).map(([e,n])=>`<tr><td>${esc(e)}</td><td><span class="bar" style="width:${Math.min(120,n*14)}px;background:#E0503D"></span>${esc(U.timesUnit(n))}</td></tr>`).join('')}</table>` : `<p class="hint">${esc(U.sumNoEvents)}</p>`}
-    ${S.meds.length?`<h2>${esc(U.sumMeds)}</h2><table>${S.meds.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.times.join('、'))}</td></tr>`).join('')}</table>`:''}
+    ${S.meds.length?`<h2>${esc(U.sumMeds)}</h2><table>${S.meds.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.times.join(/^(en|ko)/.test(S.locale)?', ':'、'))}</td></tr>`).join('')}</table>`:''}
     ${notes.length?`<h2>${esc(U.sumNotes)}</h2><table>${notes.map(([k,n])=>`<tr><td style="width:60px;color:var(--ink-3)">${k.slice(5)}</td><td>${esc(n)}</td></tr>`).join('')}</table>`:''}
     ${(S.askDoc||[]).length?`<h2>${esc(U.askTitle)}</h2><ul class="ask-print">${S.askDoc.map(x=>`<li><span class="box"></span>${esc(x.text)}</li>`).join('')}</ul>`:''}
     <p class="note">${esc(U.summaryNote)}</p>
@@ -3407,6 +3505,9 @@ document.addEventListener('click', e => {
     case 'wk-share': weekCardShare(); break;
     case 'move-open': moveStop(); mv = newMove(); go('move'); break;
     case 'wall-open': go('wall'); break;
+    case 'plan-open': go('plan'); break;
+    case 'plan-back': famTab = 'settings'; go('family'); break;
+    case 'trial-start': if(!S.trial){ S.trial = { start: todayKey() }; save(); toast(U.trialStarted); } renderPlan(); break;
     case 'ask-add': { const el = $('#asktext'); const t = el ? el.value.trim() : ''; if(!t){ toast(U.askNeed); if(el) el.focus(); break; } S.askDoc = S.askDoc||[]; if(S.askDoc.length >= 20){ toast(U.askFull); break; }
       S.askDoc.push({ id: Date.now().toString(36), text: t, ts: Date.now() }); save(); $('#asksec').innerHTML = askSecHTML(); toast(U.saved); const n = $('#asktext'); if(n) n.focus(); break; }
     case 'ask-del': S.askDoc = (S.askDoc||[]).filter(x => x.id !== b.dataset.id); save(); $('#asksec').innerHTML = askSecHTML(); break;
@@ -3469,12 +3570,30 @@ document.addEventListener('change', async e => {
   const rd = new FileReader();
   rd.onload = () => { let j; try{ j = JSON.parse(rd.result); }catch(_){ j=null; }
     if(!j || j.app!=='yiki' || !j.data || !Array.isArray(j.data.sessions)){ toast(U.importFail); return; }
-    ask(U.importConfirm).then(ok=>{ if(!ok) return; const prev = S; S = sanitize(j.data); if(save(true)) location.reload(); else { S = prev; toast(U.storageFull); } }); };
+    ask(U.importConfirm).then(ok=>{ if(!ok) return; const prev = S; S = sanitize(j.data); if(save(true)) mediaBusy.then(() => location.reload()); else { S = prev; toast(U.storageFull); } }); };
   rd.readAsText(e.target.files[0]); e.target.value='';
 });
 
 /* 換語言後，用藥時段跟著換成新語言的名稱（時段是固定 4 個：早／中／晚／睡前），今天的打勾紀錄也一起換 */
 const ALL_SLOTS = [['早','中','晚','睡前'],['朝','昼','夜','寝る前'],['아침','점심','저녁','자기 전'],['Morning','Noon','Evening','Bedtime']];
+/* 用藥提醒通知：網頁版做不到「時間到了主動跳通知」，包成手機 App（Capacitor）後才會啟用。
+   每個有藥的時段每天提醒一次；通知上不顯示藥名（鎖定畫面別人看得到）。 */
+const REMIND_AT = [[8,0],[12,30],[18,30],[21,30]];
+function medReminderPlan(){
+  const slots = [...new Set((S.meds||[]).flatMap(m => m.times))].map(t => U.medSlots.indexOf(t)).filter(i => i >= 0).sort((a,b) => a - b);
+  return slots.map(i => ({ id: 7100 + i, title: U.remindTitle, body: U.remindBody(U.medSlots[i]), schedule: { on: { hour: REMIND_AT[i][0], minute: REMIND_AT[i][1] }, allowWhileIdle: true } }));
+}
+let remindSig = null;
+async function syncReminders(){
+  const LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications; if(!LN) return false;
+  const plan = medReminderPlan(); const sig = JSON.stringify(plan); if(sig === remindSig) return true;
+  try{
+    if(plan.length){ let p = await LN.checkPermissions(); if(p.display !== 'granted') p = await LN.requestPermissions(); if(p.display !== 'granted') return false; }
+    await LN.cancel({ notifications: [0,1,2,3].map(i => ({ id: 7100 + i })) });
+    if(plan.length) await LN.schedule({ notifications: plan });
+    remindSig = sig; return true;
+  }catch(_){ return false; }
+}
 function normalizeMedSlots(){
   let changed = false; const map = {};
   ALL_SLOTS.forEach(list => list.forEach((t,i) => { if(U.medSlots[i] && t !== U.medSlots[i]) map[t] = U.medSlots[i]; }));
@@ -3484,7 +3603,32 @@ function normalizeMedSlots(){
 }
 normalizeMedSlots();
 render();
+setTimeout(() => { try{ syncReminders(); }catch(_){} }, 800);
+/* 舊版把照片存在 localStorage：啟動後搬到 IndexedDB，騰出空間 */
+setTimeout(() => { try{ if(idbUsable() && /"data:(image|audio)\//.test(localStorage.getItem(STORE_KEY)||'')) save(true); }catch(_){} }, 1200);
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+<script>/* 照片與錄音存在 IndexedDB（容量比 localStorage 的 5MB 大很多）；先把它們讀出來，再啟動 App */
+window.yikiIDB=(function(){var dbp=null;
+  function open(){ if(dbp) return dbp; dbp=new Promise(function(res,rej){ try{ var r=indexedDB.open('yiki',1); r.onupgradeneeded=function(){ r.result.createObjectStore('media'); }; r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; r.onblocked=function(){ rej(new Error('blocked')); }; }catch(e){ rej(e); } }); dbp.catch(function(){ dbp=null; }); return dbp; }
+  function tx(mode,fn){ return open().then(function(db){ return new Promise(function(res,rej){ var out, t=db.transaction('media',mode); t.oncomplete=function(){ res(out); }; t.onerror=t.onabort=function(){ rej(t.error||new Error('tx')); }; out=fn(t.objectStore('media')); }); }); }
+  return {
+    all:function(){ var m={}; return tx('readonly',function(s){ s.openCursor().onsuccess=function(e){ var c=e.target.result; if(c){ if(typeof c.value==='string') m[c.key]=c.value; c.continue(); } }; return m; }); },
+    get:function(keys){ var m={}; return tx('readonly',function(s){ keys.forEach(function(k){ s.get(k).onsuccess=function(e){ if(typeof e.target.result==='string') m[k]=e.target.result; }; }); return m; }); },
+    put:function(pairs){ return tx('readwrite',function(s){ pairs.forEach(function(p){ s.put(p[1],p[0]); }); }); },
+    del:function(keys){ return tx('readwrite',function(s){ keys.forEach(function(k){ s.delete(k); }); }); },
+    clear:function(){ return tx('readwrite',function(s){ s.clear(); }); } };
+})();
+(function(){
+  /* ok：true＝已讀出全部；'lazy'＝開機時沒有需要讀的；false＝讀不到（這次先保留原樣，不刪任何東西） */
+  window.YIKI_MEDIA={ ok:'lazy', map:{} };
+  var done=false, run=function(){ if(done) return; done=true; var s=document.createElement('script'); s.textContent=document.getElementById('yiki-app').textContent; document.body.appendChild(s); };
+  var raw=null; try{ raw=localStorage.getItem('yiki.v1'); }catch(e){}
+  if(!raw || raw.indexOf('"idb:')<0){ run(); return; }
+  if(!window.indexedDB){ window.YIKI_MEDIA.ok=false; run(); return; }
+  var t=setTimeout(function(){ if(!done){ window.YIKI_MEDIA.ok=false; run(); } }, 3000);
+  window.yikiIDB.all().then(function(m){ if(done) return; window.YIKI_MEDIA.map=m; window.YIKI_MEDIA.ok=true; clearTimeout(t); run(); }, function(){ if(done) return; window.YIKI_MEDIA.ok=false; clearTimeout(t); run(); });
+})();
 </script>
 </body>
 </html>
