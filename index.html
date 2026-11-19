@@ -1362,6 +1362,20 @@ html.hc .plan-card.fam,html.hc .plan-card.always{background:#fff}
 .med-row>div:last-child{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
 .med-row .st{flex-wrap:wrap;justify-content:flex-end}
 .med-row .st i{width:auto;min-width:26px;padding:0 8px;border-radius:999px!important;white-space:nowrap}
+/* 故事書照片保留原本比例 */
+.story-page .polaroid{width:auto;max-width:min(78vw,340px)}
+.story-page .polaroid img{aspect-ratio:auto;object-fit:contain;width:auto;max-width:100%;max-height:min(46vh,420px);margin:0 auto}
+@media (max-height:780px){.story-page .polaroid img{max-height:38vh}.story-page{gap:12px}}
+.gift .polaroid{width:auto;max-width:min(56vw,220px)}
+.gift .polaroid img{aspect-ratio:auto;object-fit:contain;width:auto;max-width:100%;max-height:min(30vh,240px);margin:0 auto}
+.calm-photo img{object-fit:contain;background:#F3EEE4}
+figure.lowres img{outline:3px dashed var(--red);outline-offset:-3px}
+.lowres-hint{margin:0 0 10px;padding:8px 12px;border-radius:12px;background:#FFF1E6;color:var(--ink)}
+.remind-times{margin-top:12px;padding-top:10px;border-top:1.5px dashed var(--line)}
+.remind-times .hint{display:block;margin:2px 0 8px}
+.rt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.rt-grid label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
+.rt-grid input{font:inherit;font-size:16px;padding:8px 10px;border-radius:12px;border:2px solid var(--line);background:var(--card);min-height:44px}
 </style>
 </head>
 <body>
@@ -1373,7 +1387,7 @@ html.hc .plan-card.fam,html.hc .plan-card.always{background:#fff}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.47.0';
+const BUILD = '2.48.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -1403,6 +1417,7 @@ function sanitize(j){
   ['levels','seen','logs','medLog','storyLog','moveLog','habits','recent'].forEach(k => { if(!isObj(o[k])) o[k] = {}; });
   if('installHide' in o) o.installHide = !!o.installHide;
   if(o.demo !== undefined){ if(!isObj(o.demo)) delete o.demo; else { ['days','medIds','medKeys','moveDays'].forEach(k => { o.demo[k] = Array.isArray(o.demo[k]) ? o.demo[k].filter(x => typeof x === 'string' && x.length < 120).slice(0,200) : []; }); } }
+  if(o.remindAt !== undefined){ if(Array.isArray(o.remindAt) && o.remindAt.length === 4 && o.remindAt.every(t => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t))) o.remindAt = o.remindAt.slice(); else delete o.remindAt; }
   if(o.trial !== undefined){ if(isObj(o.trial) && typeof o.trial.start === 'string' && DATE_RE.test(o.trial.start)) o.trial = { start: o.trial.start }; else delete o.trial; }
   if(o.askDoc !== undefined){ o.askDoc = Array.isArray(o.askDoc) ? o.askDoc.filter(x => isObj(x) && typeof x.text === 'string' && x.text.trim()).slice(0,20).map(x => ({ id: nid(x.id), text: x.text.slice(0,80), ts: +x.ts || 0 })) : []; }
   if(o.cg !== undefined){ if(!isObj(o.cg)) o.cg = {}; Object.keys(o.cg).forEach(k => { if(!DATE_RE.test(k) || ![0,1,2].includes(o.cg[k])) delete o.cg[k]; }); }
@@ -2578,7 +2593,7 @@ async function unpackCode(text){
   const obj = JSON.parse(new TextDecoder().decode(bytes)); if(!obj || typeof obj !== 'object') return null;
   return { kind: m[1], obj };
 }
-function settingsPayload(){ return { v:1, fc:S.familyCode, n:S.elderName, meds:S.meds.filter(m => !(S.demo && (S.demo.medIds||[]).includes(m.id))), plans:S.plans, sos:S.sos||null, note:S.note ? { text:S.note.text, from:S.note.from, ts:S.note.ts } : null, mode:S.mode, fontScale:S.fontScale, rate:S.rate, hintAfter:S.hintAfter, hab:S.hab||null, homeHide:S.homeHide||[], voice:S.voice, sound:S.sound, hc:S.hc, ts:Date.now() }; }
+function settingsPayload(){ return { v:1, fc:S.familyCode, n:S.elderName, remindAt:S.remindAt, meds:S.meds.filter(m => !(S.demo && (S.demo.medIds||[]).includes(m.id))), plans:S.plans, sos:S.sos||null, note:S.note ? { text:S.note.text, from:S.note.from, ts:S.note.ts } : null, mode:S.mode, fontScale:S.fontScale, rate:S.rate, hintAfter:S.hintAfter, hab:S.hab||null, homeHide:S.homeHide||[], voice:S.voice, sound:S.sound, hc:S.hc, ts:Date.now() }; }
 function recordsPayload(days = 14){
   /* LINE 一則訊息最多 5000 字：預設帶最近兩週，太長會自動縮短（見 syncShare） */
   const keep = new Set(lastNDays(days)); const pick = o => Object.fromEntries(Object.entries(o||{}).filter(([k]) => keep.has(k)));
@@ -2594,6 +2609,7 @@ function applySettings(o){
   if(o.note && o.note.text && (!n.note || (+o.note.ts||0) > (+n.note.ts||0))) n.note = { text:o.note.text, from:o.note.from, ts:o.note.ts };
   ['mode','fontScale','rate','hintAfter','voice','sound','hc'].forEach(k => { if(k in o) n[k] = o[k]; });
   if(o.hab) n.hab = o.hab; if(Array.isArray(o.homeHide)) n.homeHide = o.homeHide;
+  if(Array.isArray(o.remindAt)) n.remindAt = o.remindAt;
   if(typeof o.fc === 'string') n.familyCode = o.fc;
   n.modeSet = true;
   return n;
@@ -3244,10 +3260,22 @@ function playStory(auto){
   if(pg.audio){ if(auto) return; try{ storyAudio = new Audio(pg.audio); storyAudio.play().catch(()=>{}); }catch(_){} }
   else if(pg.text) speak((pg.year?pg.year+'，':'') + pg.text);
 }
+/* 舊版存的照片比較小（看起來糊）：在照護頁標出來，提醒家人重新選一次 */
+const LOWRES = { photosec: 600, storysec: 800 };
+function lowResScan(sec){
+  const el = document.getElementById(sec); if(!el || !idbUsable()) return;
+  const figs = [...el.querySelectorAll('figure')]; let n = 0;
+  figs.forEach(f => { const im = f.querySelector('img'); const low = f.dataset.q !== '2' && !!im && im.complete && im.naturalWidth > 0 && Math.max(im.naturalWidth, im.naturalHeight) < LOWRES[sec]; f.classList.toggle('lowres', low); if(low) n++; });
+  let h = el.querySelector('.lowres-hint');
+  if(n){ if(!h){ h = document.createElement('p'); h.className = 'hint lowres-hint'; const g = el.querySelector('.photo-grid, .story-grid'); if(g) g.after(h); } if(h) h.textContent = U.lowResHint(n); }
+  else if(h) h.remove();
+}
+document.addEventListener('change', e => { const t = e.target; if(t && t.dataset && t.dataset.rt !== undefined && /^\d\d:\d\d$/.test(t.value)){ const a = [0,1,2,3].map(remindAt); a[+t.dataset.rt] = t.value; S.remindAt = a; save(); toast(U.saved); } });
+document.addEventListener('load', e => { const t = e.target; if(t && t.tagName === 'IMG'){ const sec = t.closest && t.closest('#photosec, #storysec'); if(sec) lowResScan(sec.id); } }, true);
 function storySecHTML(){
   const st = S.story||[];
   return `<h2>${esc(U.storyTitle)}<small>${esc(U.storySub)}</small></h2>
-    ${st.length?`<div class="story-grid">${st.map(x=>`<figure class="sg"><img src="${esc(x.img)}" alt=""><figcaption>${x.year?`<b>${esc(x.year)}</b> `:''}${esc(x.text||'')}</figcaption>${x.audio?`<span class="has-audio">${ico('speaker')}</span>`:''}<button class="ph-del" data-act="story-del" data-id="${esc(x.id)}" aria-label="${esc(U.medDelete)}">×</button></figure>`).join('')}</div>`:`<div class="empty">${esc(U.storyEmpty)}</div>`}
+    ${st.length?`<div class="story-grid">${st.map(x=>`<figure class="sg" data-q="${x.q===2?2:1}"><img src="${esc(x.img)}" alt=""><figcaption>${x.year?`<b>${esc(x.year)}</b> `:''}${esc(x.text||'')}</figcaption>${x.audio?`<span class="has-audio">${ico('speaker')}</span>`:''}<button class="ph-del" data-act="story-del" data-id="${esc(x.id)}" aria-label="${esc(U.medDelete)}">×</button></figure>`).join('')}</div>`:`<div class="empty">${esc(U.storyEmpty)}</div>`}
     <div class="story-form">
       <div class="sf-row"><input type="text" id="styear" maxlength="10" inputmode="numeric" enterkeyhint="next" placeholder="${esc(U.storyYearPh)}"><input type="text" id="sttext" maxlength="60" placeholder="${esc(U.storyTextPh)}"></div>
       <div class="sf-row"><button class="small-btn" data-act="story-rec" id="strec">${ico('speaker')} ${esc(pendingStory&&pendingStory.audio?U.storyRecDone:U.storyRec)}</button><button class="save-btn" data-act="story-add">${esc(U.storyAdd)}</button></div>
@@ -3276,23 +3304,29 @@ async function toggleRecord(target='story'){
 function photosSecHTML(){
   const ps = S.photos||[];
   return `<h2>${esc(U.photosTitle)}<small>${esc(U.photosSub)}</small></h2>
-    ${ps.length ? `<div class="photo-grid">${ps.map(x=>`<figure class="ph"><img src="${esc(x.img)}" alt="${esc(x.name)}"><figcaption>${esc(x.name)}</figcaption><button class="ph-del" data-act="photo-del" data-id="${esc(x.id)}" aria-label="${esc(U.medDelete)}">×</button></figure>`).join('')}</div>` : `<div class="empty">${esc(U.photoEmpty)}</div>`}
+    ${ps.length ? `<div class="photo-grid">${ps.map(x=>`<figure class="ph" data-q="${x.q===2?2:1}"><img src="${esc(x.img)}" alt="${esc(x.name)}"><figcaption>${esc(x.name)}</figcaption><button class="ph-del" data-act="photo-del" data-id="${esc(x.id)}" aria-label="${esc(U.medDelete)}">×</button></figure>`).join('')}</div>` : `<div class="empty">${esc(U.photoEmpty)}</div>`}
     <div class="hint" style="margin:8px 0 10px">${facesReady() ? esc(U.photoReady) : esc(U.photoNeed(Math.max(0,4-new Set(ps.map(x=>x.name)).size)))}</div>
     <div class="add-med"><input type="text" id="phname" placeholder="${esc(U.photoNamePh)}" maxlength="12" style="font-size:16px;padding:11px 12px;border-radius:12px;border:2px solid var(--line);flex:1;min-width:0">
       <button class="save-btn" data-act="photo-add" style="white-space:nowrap">${esc(U.photoAdd)}</button></div>
     <input type="file" id="phfile" accept="image/*" hidden>`;
 }
 /* 有 IndexedDB 時空間夠，照片存清楚一點（手機螢幕是 3 倍密度）；退回 localStorage 時維持小圖 */
-function shrinkImage(file, max=360){ if(idbUsable()) max = max > 400 ? 1080 : 720; return new Promise((res,rej)=>{ const rd=new FileReader(); rd.onerror=rej;
+function shrinkImage(file, max=360, crop=true){ if(idbUsable()) max = max > 400 ? 1080 : 720; return new Promise((res,rej)=>{ const rd=new FileReader(); rd.onerror=rej;
   rd.onload=()=>{ const im=new Image(); im.onerror=rej; im.onload=()=>{ const sz=Math.min(im.width,im.height);
-    const c=document.createElement('canvas'); const out=Math.round(Math.min(max, sz)); c.width=c.height=out;
-    const sx=(im.width-sz)/2, sy=(im.height-sz)/2; c.getContext('2d').drawImage(im,sx,sy,sz,sz,0,0,out,out); res(c.toDataURL('image/jpeg', idbUsable() ? .86 : .78)); }; im.src=rd.result; };
+    const c=document.createElement('canvas');
+    if(crop){ const out=Math.round(Math.min(max, sz)); c.width=c.height=out; const sx=(im.width-sz)/2, sy=(im.height-sz)/2; c.getContext('2d').drawImage(im,sx,sy,sz,sz,0,0,out,out); }
+    else { /* 故事書：保留原本的比例（老照片常是直式或橫式），太細長的才裁一點 */
+      let w=im.width, h=im.height, sx=0, sy=0;
+      if(w/h > 2){ sx=(w-h*2)/2; w=h*2; } else if(h/w > 2){ sy=(h-w*2)/2; h=w*2; }
+      const k=Math.min(1, max/Math.max(w,h));
+      c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k)); c.getContext('2d').drawImage(im,sx,sy,w,h,0,0,c.width,c.height); } res(c.toDataURL('image/jpeg', idbUsable() ? .86 : .78)); }; im.src=rd.result; };
   rd.readAsDataURL(file); }); }
 function medsManageHTML(){
   const lg = medToday(), days = lastNDays(7), rate = medTakenRate(days);
   return (S.meds.length ? S.meds.map(m=>`<div class="med-row"><div class="nm">${esc(m.name)}<small>${esc(m.times.join(/^(en|ko)/.test(S.locale)?', ':'、'))}</small></div>
       <div style="display:flex;align-items:center;gap:10px"><span class="st">${m.times.map(t=>`<i class="${lg[medKey(m.id,t)]?'on':''}" title="${esc(t)}">${esc(t)}</i>`).join('')}</span>
       <button class="small-btn" data-act="med-del" data-id="${esc(m.id)}">${esc(U.medDelete)}</button></div></div>`).join('') : `<div class="empty">${esc(U.medEmpty)}</div>`) +
+    (S.meds.length && nativeLN() ? `<div class="remind-times"><b>${esc(U.remindTimesT)}</b><span class="hint">${esc(U.remindTimesS)}</span><div class="rt-grid">${U.medSlots.map((t,i)=>S.meds.some(m=>m.times.includes(t))?`<label><span>${esc(t)}</span><input type="time" data-rt="${i}" value="${remindAt(i)}"></label>`:'').join('')}</div></div>` : '') +
     (S.meds.length ? `<div class="hint" style="margin-top:8px">${esc(U.medAdherence)}：<b style="color:var(--brand)">${rate===null?'–':rate+'%'}</b></div>` : '') +
     `<div class="add-med"><div class="slots" id="medslots">${U.medSlots.map(t=>`<button data-slot="${esc(t)}" class="${newMedSlots.has(t)?'on':''}">${esc(t)}</button>`).join('')}</div>
      <input type="text" id="medname" placeholder="${esc(U.medNamePh)}" maxlength="20" style="font-size:16px;padding:11px 12px;border-radius:12px;border:2px solid var(--line)">
@@ -3559,11 +3593,11 @@ document.addEventListener('change', async e => {
     else { const ks = [...document.querySelectorAll('[data-hab=key]')].filter(x=>x.checked).map(x=>x.dataset.k); if(!ks.length){ e.target.checked = true; toast(U.habNeedOne); return; } S.hab.keys = HABIT_ALL.filter(k=>ks.includes(k)); if(typeof S.hab.on!=='boolean') S.hab.on = habOn(); }
     save(); toast(U.saved); return; }
   if(e.target.id==='stfile' && e.target.files[0]){ const f=e.target.files[0]; e.target.value='';
-    try{ const img = await shrinkImage(f, 520); S.story = S.story||[]; const pg = { id: Date.now().toString(36), img, text: pendingStory?.text||'', year: pendingStory?.year||'', audio: pendingStory?.audio||null };
+    try{ const img = await shrinkImage(f, 520, false); S.story = S.story||[]; const pg = { id: Date.now().toString(36), q: idbUsable() ? 2 : 1, img, text: pendingStory?.text||'', year: pendingStory?.year||'', audio: pendingStory?.audio||null };
       S.story.push(pg); if(!save(true)){ S.story.pop(); toast(U.photoSaveFail); return; } pendingStory = null; $('#storysec').innerHTML = storySecHTML(); toast(U.saved); }catch(_){ toast(U.importFail); }
     return; }
   if(e.target.id==='phfile' && e.target.files[0]){ const f=e.target.files[0]; e.target.value='';
-    try{ const img = await shrinkImage(f); S.photos = S.photos||[]; S.photos.push({ id: Date.now().toString(36), name: pendingPhotoName, img });
+    try{ const img = await shrinkImage(f); S.photos = S.photos||[]; S.photos.push({ id: Date.now().toString(36), q: idbUsable() ? 2 : 1, name: pendingPhotoName, img });
       if(!save(true)){ S.photos.pop(); toast(U.photoSaveFail); return; }
       $('#photosec').innerHTML = photosSecHTML(); toast(U.saved); }catch(_){ toast(U.importFail); }
     return; }
@@ -3579,14 +3613,16 @@ document.addEventListener('change', async e => {
 const ALL_SLOTS = [['早','中','晚','睡前'],['朝','昼','夜','寝る前'],['아침','점심','저녁','자기 전'],['Morning','Noon','Evening','Bedtime']];
 /* 用藥提醒通知：網頁版做不到「時間到了主動跳通知」，包成手機 App（Capacitor）後才會啟用。
    每個有藥的時段每天提醒一次；通知上不顯示藥名（鎖定畫面別人看得到）。 */
-const REMIND_AT = [[8,0],[12,30],[18,30],[21,30]];
+const REMIND_DEFAULT = ['08:00','12:30','18:30','21:30'];
+const remindAt = i => { const t = (S.remindAt||[])[i]; return /^\d\d:\d\d$/.test(t||'') ? t : REMIND_DEFAULT[i]; };
+const nativeLN = () => window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
 function medReminderPlan(){
   const slots = [...new Set((S.meds||[]).flatMap(m => m.times))].map(t => U.medSlots.indexOf(t)).filter(i => i >= 0).sort((a,b) => a - b);
-  return slots.map(i => ({ id: 7100 + i, title: U.remindTitle, body: U.remindBody(U.medSlots[i]), schedule: { on: { hour: REMIND_AT[i][0], minute: REMIND_AT[i][1] }, allowWhileIdle: true } }));
+  return slots.map(i => ({ id: 7100 + i, title: U.remindTitle, body: U.remindBody(U.medSlots[i]), schedule: { on: { hour: +remindAt(i).slice(0,2), minute: +remindAt(i).slice(3) }, allowWhileIdle: true } }));
 }
 let remindSig = null;
 async function syncReminders(){
-  const LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications; if(!LN) return false;
+  const LN = nativeLN(); if(!LN) return false;
   const plan = medReminderPlan(); const sig = JSON.stringify(plan); if(sig === remindSig) return true;
   try{
     if(plan.length){ let p = await LN.checkPermissions(); if(p.display !== 'granted') p = await LN.requestPermissions(); if(p.display !== 'granted') return false; }
