@@ -422,7 +422,7 @@ window.YIKI_LOCALES['zh-TW'] = {
     mediaNone: "還沒有照片或錄音可以傳",
     mediaSaved: "檔案已存到手機，請用 LINE 傳給另一支手機",
     mediaSame: "這些照片這支手機都已經有了",
-    mediaDone: (n,v)=>n?`已加入 ${n} 張照片${v?'和語音便條':''}`:'已加入語音便條',
+    mediaDone: (p,s,v)=>'已加入 '+[p?`${p} 張家人照片`:'',s?`${s} 頁故事書`:'',v?'語音便條':''].filter(Boolean).join('、'),
     lowResHint: n=>`有 ${n} 張是之前存的，比較模糊（紅色虛線框）。刪掉後重新選同一張，會清楚很多。`,
     remindTimesT: "提醒時間",
     remindTimesS: "時間到了，這支手機會跳出通知",

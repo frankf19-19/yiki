@@ -411,7 +411,7 @@ window.YIKI_LOCALES['en-US'] = {
     mediaNone: "There are no photos or recordings to send yet",
     mediaSaved: "File saved. Send it to the other phone by message.",
     mediaSame: "This phone already has all of these photos",
-    mediaDone: (n,v)=>n?`Added ${n} ${n===1?'photo':'photos'}${v?' and the voice note':''}`:'Added the voice note',
+    mediaDone: (p,s,v)=>'Added '+[p?`${p} family ${p===1?'photo':'photos'}`:'',s?`${s} story ${s===1?'page':'pages'}`:'',v?'the voice note':''].filter(Boolean).join(', '),
     lowResHint: n=>`${n} ${n===1?'photo was':'photos were'} saved earlier and ${n===1?'looks':'look'} a little blurry (red dashed border). Remove and pick the same photo again for a sharper copy.`,
     remindTimesT: "Reminder times",
     remindTimesS: "This phone shows a notification at these times",

@@ -412,7 +412,7 @@ window.YIKI_LOCALES['ko-KR'] = {
     mediaNone: "보낼 사진이나 녹음이 아직 없어요",
     mediaSaved: "파일을 저장했어요. 카카오톡 등으로 다른 휴대폰에 보내 주세요",
     mediaSame: "이 사진들은 이 휴대폰에 이미 있어요",
-    mediaDone: (n,v)=>n?`사진 ${n}장을 추가했어요${v?' (음성 메모 포함)':''}`:'음성 메모를 추가했어요',
+    mediaDone: (p,s,v)=>[p?`가족 사진 ${p}장`:'',s?`이야기책 ${s}쪽`:'',v?'음성 메모':''].filter(Boolean).join(', ')+' 추가했어요',
     lowResHint: n=>`${n}장은 예전에 저장한 사진이라 조금 흐릿해요(빨간 점선 테두리). 지우고 같은 사진을 다시 고르면 훨씬 선명해져요.`,
     remindTimesT: "알림 시간",
     remindTimesS: "시간이 되면 이 휴대폰에 알림이 떠요",

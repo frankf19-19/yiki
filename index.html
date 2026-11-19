@@ -1388,7 +1388,7 @@ figure.lowres img{outline:3px dashed var(--red);outline-offset:-3px}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.49.1';
+const BUILD = '2.49.2';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -2683,10 +2683,10 @@ function mediaMerge(j){
   }
   const before = [(S.photos||[]).length, (S.story||[]).length];
   S = sanitize(cand);
-  const n = (S.photos.length - before[0]) + (S.story.length - before[1]); if(voice && !(S.note && S.note.audio)){ voice = false; S.note = prev.note; }
+  const dp = S.photos.length - before[0], ds = S.story.length - before[1], n = dp + ds; if(voice && !(S.note && S.note.audio)){ voice = false; S.note = prev.note; }
   if(!n && !voice){ S = prev; toast(U.mediaSame); return; }
   if(!save(true)){ S = prev; toast(U.storageFull); return; }
-  if((location.hash||'') === '#family') renderFamily(); toast(U.mediaDone(n, voice));
+  if((location.hash||'') === '#family') renderFamily(); toast(U.mediaDone(dp, ds, voice));
 }
 function syncSecHTML(){
   return `<h2>${esc(U.syncTitle)}<small>${esc(U.syncSub)}</small></h2>
