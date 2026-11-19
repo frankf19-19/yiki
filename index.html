@@ -1376,6 +1376,7 @@ figure.lowres img{outline:3px dashed var(--red);outline-offset:-3px}
 .rt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
 .rt-grid label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
 .rt-grid input{font:inherit;font-size:16px;padding:8px 10px;border-radius:12px;border:2px solid var(--line);background:var(--card);min-height:44px}
+.media-xfer{margin-top:16px;padding-top:12px;border-top:1.5px dashed var(--line)}.media-xfer .hint{margin:4px 0 10px}
 </style>
 </head>
 <body>
@@ -1387,7 +1388,7 @@ figure.lowres img{outline:3px dashed var(--red);outline-offset:-3px}
 /* ======================================================================
    憶起玩 Yiki — v0.2.0 視覺精緻化版
    ====================================================================== */
-const BUILD = '2.48.0';
+const BUILD = '2.49.0';
 const STORE_KEY = 'yiki.v1';
 
 /* ---------- 狀態 ---------- */
@@ -2658,6 +2659,35 @@ async function syncApply(){
   if(S.role === 'elder' && r.kind === 'S'){ go('play'); render(); } else renderFamily();
   toast(msg);
 }
+/* 照片、故事書和語音便條放不進 LINE 文字代碼，改用檔案傳；匯入時是「加進去」，不會蓋掉原本的資料 */
+async function mediaSend(){
+  if(HELD.photos.length || HELD.story.length || Object.keys(HELD.audio).length){ toast(U.exportHeld); return; }
+  const note = S.note && S.note.audio ? { text:S.note.text, from:S.note.from, ts:S.note.ts, audio:S.note.audio } : null;
+  if(!(S.photos||[]).length && !(S.story||[]).length && !note){ toast(U.mediaNone); return; }
+  const json = JSON.stringify({ app:'yiki', kind:'media', build:BUILD, fc:S.familyCode, photos:S.photos||[], story:S.story||[], note });
+  const name = 'yiki-photos-' + todayKey() + '.json';
+  try{ const file = new File([json], name, { type:'application/json' });
+    if(navigator.canShare && navigator.canShare({ files:[file] })){ try{ await navigator.share({ files:[file], title: L.brand.name }); return; }catch(e){ if(e && e.name === 'AbortError') return; } } }catch(_){}
+  try{ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type:'application/json' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800); toast(U.mediaSaved); }catch(_){ toast(U.fbCopyFail); }
+}
+function mediaMerge(j){
+  const prev = S, has = (arr, id) => arr.some(x => x.id === id);
+  const np = (Array.isArray(j.photos) ? j.photos : []).filter(x => x && typeof x === 'object' && !has(S.photos||[], x.id));
+  const ns = (Array.isArray(j.story) ? j.story : []).filter(x => x && typeof x === 'object' && !has(S.story||[], x.id));
+  const cand = Object.assign({}, S, { photos: (S.photos||[]).concat(np).slice(0, 30), story: (S.story||[]).concat(ns).slice(0, 40) });
+  let voice = false; const jn = j.note;
+  if(jn && typeof jn === 'object' && typeof jn.audio === 'string'){
+    const mine = S.note, jt = +jn.ts || 0, mt = mine ? (+mine.ts || 0) : -1;
+    if(mine && jt === mt && mine.audio !== jn.audio){ cand.note = Object.assign({}, mine, { audio: jn.audio, heard: false }); voice = true; }
+    else if(!mine || jt > mt){ cand.note = { text: jn.text, from: jn.from, ts: jn.ts, audio: jn.audio }; voice = true; }
+  }
+  const before = [(S.photos||[]).length, (S.story||[]).length];
+  S = sanitize(cand);
+  const n = (S.photos.length - before[0]) + (S.story.length - before[1]); if(voice && !(S.note && S.note.audio)){ voice = false; S.note = prev.note; }
+  if(!n && !voice){ S = prev; toast(U.mediaSame); return; }
+  if(!save(true)){ S = prev; toast(U.storageFull); return; }
+  if((location.hash||'') === '#family') renderFamily(); toast(U.mediaDone(n, voice));
+}
 function syncSecHTML(){
   return `<h2>${esc(U.syncTitle)}<small>${esc(U.syncSub)}</small></h2>
     <div class="sync-acts"><button class="save-btn" data-act="sync-s">${esc(U.syncBtnS)}</button><button class="small-btn" data-act="sync-r">${esc(U.syncBtnR)}</button></div>
@@ -2665,7 +2695,9 @@ function syncSecHTML(){
     ${navigator.clipboard && navigator.clipboard.readText ? `<button class="save-btn" data-act="sync-paste" style="width:100%;margin-top:12px">${esc(U.syncPasteBtn)}</button>` : ''}
     <label class="sync-lbl" for="synctext">${esc(U.syncPasteLbl)}</label>
     <textarea class="note" id="synctext" placeholder="${esc(U.syncPastePh)}" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-    <button class="small-btn" data-act="sync-apply" style="width:100%">${esc(U.syncApply)}</button>`;
+    <button class="small-btn" data-act="sync-apply" style="width:100%">${esc(U.syncApply)}</button>
+    <div class="media-xfer"><b>${esc(U.mediaTitle)}</b><p class="hint">${esc(U.mediaHint)}</p>
+      <div class="sync-acts"><button class="small-btn" data-act="media-send">${esc(U.mediaSendBtn)}</button><button class="small-btn" data-act="media-import">${esc(U.mediaImportBtn)}</button></div></div>`;
 }
 
 /* ---------- 試用：範例資料（看看用了一週的樣子，可一鍵清除）＋ App 內回報問題 ---------- */
@@ -3567,6 +3599,8 @@ document.addEventListener('click', e => {
     case 'photo-del': ask(U.medDelConfirm((S.photos.find(x=>x.id===b.dataset.id)||{}).name||'')).then(ok=>{ if(ok){ S.photos=S.photos.filter(x=>x.id!==b.dataset.id); save(); $('#photosec').innerHTML=photosSecHTML(); } }); break;
     case 'export': { if(HELD.photos.length || HELD.story.length || Object.keys(HELD.audio).length){ toast(U.exportHeld); break; } try{ const blob=new Blob([JSON.stringify({app:'yiki',build:BUILD,data:S})],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yiki-backup-'+todayKey()+'.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); toast(U.exported); }catch(_){ toast(U.importFail); } break; }
     case 'import': { const f=$('#impfile'); if(f) f.click(); break; }
+    case 'media-import': { const f=$('#impfile'); if(f) f.click(); break; }
+    case 'media-send': mediaSend(); break;
     case 'regen': S.familyCode = genCode(); save(); renderFamily(); break;
     case 'save': S.elderName = $('#en').value.trim(); save(); toast(U.saved); break;
     case 'log-save': { const lg=todayLog(); lg.note = $('#lognote').value.trim(); S.logs[todayKey()]=lg; save(); toast(U.logSaved); $('#logsec').innerHTML = `<h2>${esc(U.logTitle)}<small>${esc(U.logSub)}</small></h2>${logFormHTML()}${logStripHTML()}`; break; }
@@ -3604,6 +3638,7 @@ document.addEventListener('change', async e => {
   if(e.target.id!=='impfile' || !e.target.files[0]) return;
   const rd = new FileReader();
   rd.onload = () => { let j; try{ j = JSON.parse(rd.result); }catch(_){ j=null; }
+    if(j && j.app === 'yiki' && j.kind === 'media'){ mediaMerge(j); return; }
     if(!j || j.app!=='yiki' || !j.data || !Array.isArray(j.data.sessions)){ toast(U.importFail); return; }
     ask(U.importConfirm).then(ok=>{ if(!ok) return; const prev = S; S = sanitize(j.data); if(save(true)) mediaBusy.then(() => location.reload()); else { S = prev; toast(U.storageFull); } }); };
   rd.readAsText(e.target.files[0]); e.target.value='';
